@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/Backend/">
+    <Project Path="Backend/ConectaMentes.Api/ConectaMentes.Api.csproj" />
+    <Project Path="Backend/ConectaMentes.Application/ConectaMentes.Application.csproj" />
+    <Project Path="Backend/ConectaMentes.Domain/ConectaMentes.Domain.csproj" />
+    <Project Path="Backend/ConectaMentes.Infrastructure/ConectaMentes.Infrastructure.csproj" />
+    <Project Path="Backend/ConectaMentes.Tests/ConectaMentes.Tests.csproj" />
+  </Folder>
+</Solution>
