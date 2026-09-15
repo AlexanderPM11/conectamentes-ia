@@ -59,3 +59,18 @@ Cada spec de `specs/` sigue la misma plantilla para que el agente los procese
 de forma consistente: Objetivo → Historias de usuario → Criterios de
 aceptación (Given/When/Then) → Reglas de negocio → Entidades y datos →
 Endpoints sugeridos → Pantallas mobile-first → Diagrama a generar.
+
+## Ejecución con Docker
+
+1. Copia .env.example como .env y ajusta los secretos.
+2. Ejecuta docker compose up --build.
+3. Abre http://localhost:3000; la API queda disponible en
+   http://localhost:8080 y Swagger en /swagger.
+
+El compose levanta MySQL, espera su health check y luego inicia la API y la
+PWA. Las variables de .env se mapean al contenedor de backend y VITE_API_URL
+se inyecta durante el build del frontend.
+
+Por defecto, MySQL se publica en el puerto local 3307 para evitar conflictos
+con instalaciones locales que ya usen 3306; dentro de Docker sigue disponible
+en mysql:3306.

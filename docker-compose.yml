@@ -1,0 +1,56 @@
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: ./Backend
+      dockerfile: ConectaMentes.Api/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ASPNETCORE_HTTP_PORTS: ${ASPNETCORE_HTTP_PORTS:-8080}
+      ConnectionStrings__Default: server=mysql;port=3306;database=${MYSQL_DATABASE};user=${MYSQL_USER};password=${MYSQL_PASSWORD}
+      Jwt__Key: ${Jwt__Key}
+      Jwt__Issuer: ${Jwt__Issuer:-ConectaMentes.Api}
+      Jwt__Audience: ${Jwt__Audience:-ConectaMentes.Frontend}
+      Cors__Origins__0: http://localhost:${FRONTEND_PORT:-3000}
+      DisableHttpsRedirection: ${DisableHttpsRedirection:-true}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "${ASPNETCORE_HTTP_PORTS:-8080}:8080"
+
+  frontend:
+    build:
+      context: ./Frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      - api
+
+volumes:
+  mysql_data:

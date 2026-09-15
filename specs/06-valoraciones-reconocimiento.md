@@ -1,0 +1,72 @@
+# Spec 06 — Valoración de la sesión y reconocimiento
+
+## Objetivo
+
+Cerrar el ciclo de una sesión registrando si fue útil, para mejorar
+recomendaciones futuras y reconocer la contribución del colaborador sin
+convertir el apoyo en competencia.
+
+## Historias de usuario
+
+- Como participante de una sesión, quiero indicar si el objetivo se logró y
+  qué necesita seguimiento.
+- Como colaborador, quiero recibir reconocimiento por mi aporte académico.
+- Como estudiante, quiero que mi valoración se enfoque en la experiencia
+  académica, no en juzgar a la persona.
+
+## Criterios de aceptación
+
+- **Given** una Sesión marcada como `completada`, **when** cada participante
+  entra a valorarla, **then** puede calificar utilidad, respeto,
+  cumplimiento y claridad, más un comentario libre opcional.
+- **Given** un comentario libre de valoración, **when** contiene lenguaje
+  sobre características personales en vez de la experiencia académica
+  (regla del informe, sección 10), **then** el formulario advierte al
+  usuario antes de enviarlo (validación de guía, no censura automática
+  estricta en el MVP) usando el componente de mensaje personalizado.
+- **Given** suficientes valoraciones positivas de un colaborador, **when**
+  se cumplen los criterios definidos (ej. cantidad de sesiones completadas y
+  promedio de valoración), **then** se le otorga un `Reconocimiento`
+  (insignia o constancia) visible en su perfil.
+- **Given** una valoración registrada, **when** el motor de coincidencias
+  vuelve a ejecutarse (spec 04), **then** esa valoración influye en el
+  puntaje de compatibilidad futuro del colaborador evaluado.
+- **Given** el formulario de valoración en móvil, **when** el usuario
+  califica con estrellas/escalas, **then** los controles son táctiles
+  (sin depender de precisión de mouse) y no accionan zoom.
+
+## Reglas de negocio
+
+- La reputación de un colaborador no depende solo de una calificación
+  promedio ("estrellas"); debe combinar cumplimiento, claridad y
+  constancia (informe, sección 10).
+- Las valoraciones deben referirse a la experiencia académica, no a
+  características personales del compañero.
+- El reconocimiento es informativo, no competitivo: no se debe implementar
+  como ranking público comparativo entre estudiantes.
+
+## Entidades y datos
+
+- **Valoracion**: id, sesionId, autorId, utilidad, respeto, cumplimiento,
+  claridad, comentario, fecha.
+- **Reconocimiento**: id, usuarioId, tipo, criterioOrigen, fechaOtorgado.
+
+## Endpoints sugeridos
+
+- `POST /api/sesiones/{id}/valoraciones`
+- `GET /api/usuarios/{id}/reconocimientos`
+- `GET /api/usuarios/{id}/reputacion` (resumen agregado, no solo promedio)
+
+## Pantallas mobile-first
+
+1. Formulario de valoración post-sesión (escalas simples, comentario
+   opcional).
+2. Vista de perfil con reconocimientos/insignias obtenidas.
+3. Mensaje de agradecimiento/confirmación tras enviar la valoración
+   (componente propio, no `alert()`).
+
+## Diagrama a generar
+
+Diagrama de **estados** (state machine) de una Sesión y su efecto en
+Valoración/Reconocimiento: `agendada` → `completada` → `valorada` →
+(condicional) `reconocimiento otorgado`; rama `cancelada` sin valoración.

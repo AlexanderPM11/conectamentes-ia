@@ -1,0 +1,20 @@
+# .NET
+**/bin/
+**/obj/
+*.user
+*.suo
+
+# Frontend
+Frontend/node_modules/
+Frontend/dist/
+Frontend/.vite/
+*.tsbuildinfo
+
+# Local environment
+.env
+.env.*
+!.env.example
+
+# IDE
+.vs/
+.vscode/
