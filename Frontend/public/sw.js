@@ -1,7 +1,9 @@
-const CACHE = 'conectamente-shell-v31';
+const CACHE = 'conectamente-shell-v32';
 const SHELL = ['/', '/index.html', '/manifest.json?v=20260916-2', '/offline.html', '/icons/icon-180.png?v=20260916-2', '/icons/icon-192.png?v=20260916-2', '/icons/icon-512.png?v=20260916-2'];
 self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL))));
-self.addEventListener('message', event => { if (event.data?.type === 'SKIP_WAITING') self.skipWaiting(); });
+self.addEventListener('message', event => {
+  if (event.data?.type === 'SKIP_WAITING') event.waitUntil(self.skipWaiting());
+});
 self.addEventListener('activate', event => event.waitUntil(Promise.all([caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key)))), self.clients.claim()])));
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;

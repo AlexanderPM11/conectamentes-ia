@@ -215,17 +215,27 @@ function App() {
 function usePwaUpdate() {
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
   const [updating, setUpdating] = useState(false);
+  const updateRequested = useRef(false);
+  const reloadTimer = useRef<number | null>(null);
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
     let registration: ServiceWorkerRegistration | null = null; let interval = 0; let reloading = false;
-    const revealUpdate = () => { if (registration?.waiting) setWaitingWorker(registration.waiting); };
+    const reloadOnce = () => { if (reloading) return; reloading = true; if (reloadTimer.current) window.clearTimeout(reloadTimer.current); location.reload(); };
+    const revealUpdate = () => { if (!updateRequested.current && registration?.waiting?.state === 'installed') setWaitingWorker(registration.waiting); };
     const updateFound = () => { const worker = registration?.installing; worker?.addEventListener('statechange', () => { if (worker.state === 'installed' && navigator.serviceWorker.controller) revealUpdate(); }); };
-    const controllerChanged = () => { if (reloading) return; reloading = true; location.reload(); };
-    navigator.serviceWorker.addEventListener('controllerchange', controllerChanged);
+    navigator.serviceWorker.addEventListener('controllerchange', reloadOnce);
     navigator.serviceWorker.register('/sw.js').then(current => { registration = current; revealUpdate(); current.addEventListener('updatefound', updateFound); current.update().then(revealUpdate).catch(() => undefined); interval = window.setInterval(() => current.update(), 5 * 60 * 1000); }).catch(() => undefined);
-    return () => { if (interval) window.clearInterval(interval); registration?.removeEventListener('updatefound', updateFound); navigator.serviceWorker.removeEventListener('controllerchange', controllerChanged); };
+    return () => { if (interval) window.clearInterval(interval); if (reloadTimer.current) window.clearTimeout(reloadTimer.current); registration?.removeEventListener('updatefound', updateFound); navigator.serviceWorker.removeEventListener('controllerchange', reloadOnce); };
   }, []);
-  function applyUpdate() { if (!waitingWorker) return; setUpdating(true); waitingWorker.postMessage({ type: 'SKIP_WAITING' }); }
+  function applyUpdate() {
+    if (!waitingWorker || updating) return;
+    updateRequested.current = true;
+    setUpdating(true);
+    const worker = waitingWorker;
+    setWaitingWorker(null);
+    worker.postMessage({ type: 'SKIP_WAITING' });
+    reloadTimer.current = window.setTimeout(() => location.reload(), 4000);
+  }
   return { available: Boolean(waitingWorker), updating, applyUpdate };
 }
 
