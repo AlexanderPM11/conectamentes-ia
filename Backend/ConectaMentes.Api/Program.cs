@@ -150,6 +150,30 @@ requests.MapPost("/{id:guid}/cancelar", async (Guid id, ClaimsPrincipal p, Conec
 var matches = secured.MapGroup("/solicitudes/{requestId:guid}").WithTags("Coincidencias");
 matches.MapPost("/calcular-coincidencias", async (Guid requestId, ClaimsPrincipal p, ConectaMentesDbContext db) => { var request = await db.SupportRequests.SingleOrDefaultAsync(x => x.Id == requestId && x.UserId == ApiIdentity.UserId(p)); if (request is null) return Results.NotFound(); var topic = request.Topic.ToLower(); var blocked = await db.Blocks.Where(x => x.UserId == ApiIdentity.UserId(p)).Select(x => x.BlockedUserId).ToListAsync(); var candidates = await db.SkillProfiles.Where(x => x.Type == SkillType.Domina && x.UserId != ApiIdentity.UserId(p) && !blocked.Contains(x.UserId) && x.Topic.ToLower() == topic).ToListAsync(); var old = db.Matches.Where(x => x.RequestId == requestId); db.RemoveRange(old); foreach (var candidate in candidates.Take(10)) db.Matches.Add(new Match { RequestId = requestId, CandidateUserId = candidate.UserId, Score = Math.Round(candidate.Confidence * 20m, 2), Explanation = $"Domina {candidate.Topic} y puede apoyarte con tu objetivo." }); request.Status = candidates.Count > 0 ? RequestStatus.ConCoincidencias : RequestStatus.Abierta; await db.SaveChangesAsync(); return Results.Ok(candidates.Count); });
 matches.MapGet("/coincidencias", async (Guid requestId, ClaimsPrincipal p, ConectaMentesDbContext db) => Results.Ok(await (from m in db.Matches join u in db.Users on m.CandidateUserId equals u.Id where m.RequestId == requestId select new { m.Id, m.Score, m.Explanation, m.Status, candidate = u.DisplayName, m.CandidateUserId }).OrderByDescending(x => x.Score).ToListAsync()));
+app.MapGet("/api/descubrimiento", async (string? topic, string? type, ClaimsPrincipal p, ConectaMentesDbContext db) =>
+{
+    var userId = ApiIdentity.UserId(p);
+    var blocked = await db.Blocks.Where(x => x.UserId == userId || x.BlockedUserId == userId).Select(x => x.UserId == userId ? x.BlockedUserId : x.UserId).ToListAsync();
+    var normalizedTopic = topic?.Trim().ToLower();
+    var normalizedType = type?.Trim();
+    var query = from skill in db.SkillProfiles
+                join user in db.Users on skill.UserId equals user.Id
+                where skill.UserId != userId && skill.Visible && !blocked.Contains(skill.UserId)
+                select new
+                {
+                    skill.Id,
+                    skill.UserId,
+                    skill.Topic,
+                    skill.Type,
+                    skill.Confidence,
+                    user.DisplayName,
+                    user.Career,
+                    hasConnection = db.Connections.Any(connection => connection.Status != ConnectionStatus.Rechazada && (connection.RequesterId == userId && connection.CollaboratorId == skill.UserId || connection.CollaboratorId == userId && connection.RequesterId == skill.UserId))
+                };
+    if (!string.IsNullOrWhiteSpace(normalizedTopic)) query = query.Where(item => item.Topic.ToLower().Contains(normalizedTopic) || item.DisplayName.ToLower().Contains(normalizedTopic));
+    if (normalizedType is "Domina" or "NecesitaApoyo") query = query.Where(item => item.Type == Enum.Parse<SkillType>(normalizedType));
+    return Results.Ok(await query.OrderByDescending(item => item.Confidence).ThenBy(item => item.DisplayName).Take(60).ToListAsync());
+}).RequireAuthorization().WithTags("Descubrimiento");
 var matchActions = secured.MapGroup("/coincidencias").WithTags("Coincidencias");
 matchActions.MapPost("/{id:guid}/rechazar", async (Guid id, ClaimsPrincipal p, ConectaMentesDbContext db) => await db.Matches.SingleOrDefaultAsync(x => x.Id == id) is { } item ? await RejectMatch(item, p, db) : Results.NotFound());
 matchActions.MapPost("/{id:guid}/aceptar", async (Guid id, ClaimsPrincipal p, ConectaMentesDbContext db, IHubContext<RealtimeHub> hub) =>

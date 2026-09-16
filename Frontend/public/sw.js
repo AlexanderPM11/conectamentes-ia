@@ -1,4 +1,4 @@
-const CACHE = 'conectamente-shell-v11';
+const CACHE = 'conectamente-shell-v16';
 const SHELL = ['/', '/index.html', '/manifest.json'];
 self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL))));
 self.addEventListener('message', event => { if (event.data?.type === 'SKIP_WAITING') self.skipWaiting(); });

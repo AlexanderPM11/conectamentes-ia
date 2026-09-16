@@ -35,3 +35,8 @@ Prueba funcional: se crearon conexiones activas con Ana Torres, Lucas Rojas y So
 
 - 2026-09-15: Se normalizaron fechas y horas al formato dominicano (`es-DO`, zona `America/Santo_Domingo`): día/mes/año, reloj de 12 horas y marcadores a. m./p. m. en agenda, chat y notificaciones.
 - 2026-09-15: Se estabilizó la navegación móvil: botones, iconos y tipografía conservan dimensiones fijas; un selector independiente se desliza entre secciones sin provocar saltos visuales.
+- 2026-09-15: Se agregó Descubrimiento de comunidad en Conexiones, con búsqueda por tema/persona y filtros entre quienes pueden ayudar y quienes necesitan apoyo.
+- 2026-09-15: Se compactaron los encabezados de las pantallas en móvil: títulos, descripciones e iconos ocupan menos altura sin cambiar la jerarquía visual en escritorio.
+- 2026-09-15: Se simplificó el flujo de Nueva solicitud con lenguaje guiado, campos más claros, una ayuda contextual y un CTA orientado a encontrar apoyo.
+- 2026-09-15: Se ampliaron los tipos de apoyo en tres grupos: comprender y aprender, practicar y prepararme, y revisar mi avance; se conservaron los valores anteriores para compatibilidad.
+- 2026-09-15: Se rediseñó Mensajes como una agenda de contactos: búsqueda por persona o tema, estado de conexión, avatar isométrico, conversación activa y mejor jerarquía para móvil.
