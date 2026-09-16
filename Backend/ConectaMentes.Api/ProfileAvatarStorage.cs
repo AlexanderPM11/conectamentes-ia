@@ -40,7 +40,10 @@ public sealed class ProfileAvatarStorage
         if (!HasExpectedSignature(memory, extension))
             throw new AvatarValidationException("El contenido no coincide con el formato de imagen seleccionado.");
 
-        var storedName = $"{userId:N}{extension}";
+        // Cada subida debe tener una ruta distinta. Si se reutiliza el mismo
+        // nombre y luego se elimina el avatar anterior, se termina borrando
+        // también el archivo recién guardado cuando la extensión coincide.
+        var storedName = $"{userId:N}-{Guid.NewGuid():N}{extension}";
         memory.Position = 0;
         await using var destination = File.Create(Path.Combine(root, storedName));
         await memory.CopyToAsync(destination, cancellationToken);
