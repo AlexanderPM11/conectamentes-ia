@@ -41,6 +41,7 @@ services:
       Admin__DisplayName: ${Admin__DisplayName:-Superadministrador}
       ChatUploads__Path: ${ChatUploads__Path:-/app/data/chat-uploads}
       ChatUploads__MaxBytes: ${ChatUploads__MaxBytes:-10485760}
+      ProfileAvatars__Path: ${ProfileAvatars__Path:-/app/data/profile-avatars}
       DisableHttpsRedirection: ${DisableHttpsRedirection:-true}
     depends_on:
       mysql:
@@ -48,6 +49,7 @@ services:
 
     volumes:
       - chat_uploads:/app/data/chat-uploads
+      - profile_avatars:/app/data/profile-avatars
       - api_keys:/root/.aspnet/DataProtection-Keys
     networks:
       - app_network
@@ -73,6 +75,7 @@ services:
 volumes:
   mysql_data:
   chat_uploads:
+  profile_avatars:
   api_keys:
 
 networks:

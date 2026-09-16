@@ -31,6 +31,7 @@ public sealed class ConectaMentesDbContext(DbContextOptions<ConectaMentesDbConte
             entity.Property(user => user.DisplayName).HasMaxLength(120).IsRequired();
             entity.Property(user => user.Career).HasMaxLength(160).IsRequired();
             entity.Property(user => user.AcademicTerm).HasMaxLength(80).IsRequired();
+            entity.Property(user => user.AvatarPath).HasMaxLength(260);
             entity.Property(user => user.Roles).HasMaxLength(200).IsRequired();
             entity.Property(user => user.AccessStatus).HasMaxLength(20).IsRequired();
             entity.Property(user => user.AccessStatusReason).HasMaxLength(500);

@@ -11,9 +11,9 @@ public sealed class AccountAccessException(string status, string? reason) : Exce
     private static string BuildMessage(string status, string? reason) => $"Tu cuenta está {status switch { "blocked" => "bloqueada", "suspended" => "suspendida", _ => "restringida" }}.{(string.IsNullOrWhiteSpace(reason) ? string.Empty : $" Motivo: {reason}")}";
 }
 public sealed record AuthResult(string AccessToken, UserProfile User);
-public sealed record UserProfile(Guid Id, string Email, string DisplayName, string Career, string AcademicTerm, DateTimeOffset CreatedAt, IReadOnlyCollection<string> Roles)
+public sealed record UserProfile(Guid Id, string Email, string DisplayName, string Career, string AcademicTerm, DateTimeOffset CreatedAt, DateTimeOffset? AvatarUpdatedAt, IReadOnlyCollection<string> Roles)
 {
-    public static UserProfile From(User user) => new(user.Id, user.Email, user.DisplayName, user.Career, user.AcademicTerm, user.CreatedAt, user.Roles.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+    public static UserProfile From(User user) => new(user.Id, user.Email, user.DisplayName, user.Career, user.AcademicTerm, user.CreatedAt, user.AvatarUpdatedAt, user.Roles.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 }
 
 public interface IUserRepository

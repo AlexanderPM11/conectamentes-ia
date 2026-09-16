@@ -1,0 +1,4 @@
+.skill-row{grid-template-columns:auto minmax(0,1fr) auto auto}
+.skill-row-actions{display:flex!important;align-items:center;gap:5px}
+.skill-row-actions .button{min-height:32px;padding:6px 9px;font-size:.63rem}
+@media(max-width:560px){.skill-row{grid-template-columns:auto minmax(0,1fr) auto}.skill-row-actions{grid-column:2 / -1;justify-content:flex-end}.skill-row-actions .button{flex:1}}

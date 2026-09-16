@@ -1,0 +1,19 @@
+- main [ref=f1e3]:
+  - generic "ConectaMentes IA" [ref=f1e4]:
+    - text: ConectaMentes
+    - emphasis [ref=f1e5]: IA
+  - generic [ref=f1e6]:
+    - img "Estudiantes compartiendo ideas y aprendiendo juntos" [ref=f1e8]
+    - paragraph [ref=f1e9]: UNA RED PARA APRENDER
+    - heading [level=1] [ref=f1e10]:
+      - text: Aprender es mejor
+      - emphasis [ref=f1e11]: en compañía.
+    - paragraph [ref=f1e12]: Encuentra apoyo académico entre compañeros, comparte lo que sabes y avanza con confianza.
+    - generic [ref=f1e13]:
+      - button "Crear mi cuenta ↗" [ref=f1e14] [cursor=pointer]:
+        - text: Crear mi cuenta
+        - generic [ref=f1e15]: ↗
+      - button "Ya tengo una cuenta" [ref=f1e16] [cursor=pointer]
+  - generic [ref=f1e17]:
+    - generic [ref=f1e19]: Aprendizaje entre pares
+    - generic [ref=f1e22]: Privacidad desde el diseño

@@ -29,6 +29,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR();
 builder.Services.Configure<FormOptions>(options => options.MultipartBodyLengthLimit = ChatAttachmentStorage.DefaultMaxBytes + 512 * 1024);
 builder.Services.AddSingleton<ChatAttachmentStorage>();
+builder.Services.AddSingleton<ProfileAvatarStorage>();
 builder.Services.AddHttpClient("GoogleCalendar", client => client.BaseAddress = new Uri("https://www.googleapis.com/"));
 builder.Services.AddScoped<GoogleCalendarService>();
 builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
@@ -110,6 +111,8 @@ using (var scope = app.Services.CreateScope())
     await EnsureColumnAsync(db, "Users", "AccessStatus");
     await EnsureColumnAsync(db, "Users", "AccessStatusReason");
     await EnsureColumnAsync(db, "Users", "AccessStatusChangedAt");
+    await EnsureColumnAsync(db, "Users", "AvatarPath");
+    await EnsureColumnAsync(db, "Users", "AvatarUpdatedAt");
     await EnsureIndexAsync(db, "Ratings", "UX_Ratings_SessionId_AuthorId", "CREATE UNIQUE INDEX `UX_Ratings_SessionId_AuthorId` ON `Ratings` (`SessionId`, `AuthorId`);");
     await EnsureAdminRootAsync(db, builder.Configuration);
 }
@@ -165,10 +168,40 @@ app.MapGet("/api/usuarios/me", async (ClaimsPrincipal principal, IAuthService se
     return Guid.TryParse(idValue, out var id) && await service.GetProfileAsync(id, ct) is { } profile ? Results.Ok(profile) : Results.NotFound();
 }).RequireAuthorization().WithTags("Usuarios").WithName("GetCurrentUser").WithOpenApi();
 
+app.MapGet("/api/usuarios/{id:guid}/avatar", async (Guid id, ClaimsPrincipal principal, ConectaMentesDbContext db, ProfileAvatarStorage avatars, CancellationToken ct) =>
+{
+    var user = await db.Users.SingleOrDefaultAsync(item => item.Id == id, ct);
+    if (user?.AvatarPath is null) return Results.NotFound();
+    var path = avatars.Resolve(user.AvatarPath);
+    return File.Exists(path) ? Results.File(path, GetAvatarContentType(user.AvatarPath)) : Results.NotFound();
+}).RequireAuthorization().WithTags("Usuarios").WithName("GetUserAvatar").WithOpenApi();
+
 var secured = app.MapGroup("/api").RequireAuthorization();
 
 var profile = secured.MapGroup("/perfil").WithTags("Perfil");
 profile.MapGet("", async (ClaimsPrincipal p, ConectaMentesDbContext db) => Results.Ok(new { habilidades = await db.SkillProfiles.Where(x => x.UserId == ApiIdentity.UserId(p)).ToListAsync(), disponibilidad = await db.Availabilities.SingleOrDefaultAsync(x => x.UserId == ApiIdentity.UserId(p)) }));
+profile.MapPut("/datos", async (ProfileUpdateRequest request, ClaimsPrincipal p, ConectaMentesDbContext db, CancellationToken ct) =>
+{
+    var user = await db.Users.SingleOrDefaultAsync(item => item.Id == ApiIdentity.UserId(p), ct);
+    if (user is null) return Results.NotFound();
+    try { user.UpdateProfile(request.DisplayName, request.Career, request.AcademicTerm); await db.SaveChangesAsync(ct); return Results.Ok(UserProfile.From(user)); }
+    catch (ArgumentException ex) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["profile"] = [ex.Message] }); }
+}).WithName("UpdateProfileData").WithOpenApi();
+profile.MapPut("/avatar", async (IFormFile file, ClaimsPrincipal p, ConectaMentesDbContext db, ProfileAvatarStorage avatars, CancellationToken ct) =>
+{
+    var user = await db.Users.SingleOrDefaultAsync(item => item.Id == ApiIdentity.UserId(p), ct);
+    if (user is null) return Results.NotFound();
+    try
+    {
+        var previous = user.AvatarPath;
+        var stored = await avatars.SaveAsync(file, user.Id, ct);
+        user.SetAvatarPath(stored.StoredName);
+        await db.SaveChangesAsync(ct);
+        avatars.Delete(previous);
+        return Results.Ok(UserProfile.From(user));
+    }
+    catch (AvatarValidationException ex) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["avatar"] = [ex.Message] }); }
+}).WithName("UpdateProfileAvatar").WithOpenApi();
 profile.MapPost("/habilidades", async (SkillRequest request, ClaimsPrincipal p, ConectaMentesDbContext db) => { if (request.Confidence is < 1 or > 5) return Results.ValidationProblem(new Dictionary<string, string[]> { ["confidence"] = ["Debe estar entre 1 y 5."] }); var item = new SkillProfile { UserId = ApiIdentity.UserId(p), Topic = request.Topic.Trim(), Type = request.Type, Confidence = request.Confidence, Visible = request.Visible }; db.SkillProfiles.Add(item); await db.SaveChangesAsync(); return Results.Created($"/api/perfil/habilidades/{item.Id}", item); });
 profile.MapPut("/habilidades/{id:guid}", async (Guid id, SkillRequest request, ClaimsPrincipal p, ConectaMentesDbContext db) => { if (string.IsNullOrWhiteSpace(request.Topic) || request.Confidence is < 1 or > 5) return Results.ValidationProblem(new Dictionary<string, string[]> { ["skill"] = ["Indica un tema y una confianza entre 1 y 5."] }); var item = await db.SkillProfiles.SingleOrDefaultAsync(x => x.Id == id && x.UserId == ApiIdentity.UserId(p)); if (item is null) return Results.NotFound(); item.Topic = request.Topic.Trim(); item.Type = request.Type; item.Confidence = request.Confidence; item.Visible = request.Visible; await db.SaveChangesAsync(); return Results.Ok(item); });
 profile.MapDelete("/habilidades/{id:guid}", async (Guid id, ClaimsPrincipal p, ConectaMentesDbContext db) => { var item = await db.SkillProfiles.SingleOrDefaultAsync(x => x.Id == id && x.UserId == ApiIdentity.UserId(p)); if (item is null) return Results.NotFound(); db.Remove(item); await db.SaveChangesAsync(); return Results.NoContent(); });
@@ -249,6 +282,28 @@ connections.MapGet("", async (ClaimsPrincipal p, ConectaMentesDbContext db) =>
             requiresMyResponse = x.CollaboratorId == userId && x.Status == ConnectionStatus.PendienteColaborador
         })
         .ToListAsync());
+});
+connections.MapGet("/{id:guid}/solicitante", async (Guid id, ClaimsPrincipal p, ConectaMentesDbContext db, CancellationToken ct) =>
+{
+    var userId = ApiIdentity.UserId(p);
+    var connection = await db.Connections.SingleOrDefaultAsync(item => item.Id == id && item.CollaboratorId == userId && item.Status == ConnectionStatus.PendienteColaborador, ct);
+    if (connection is null) return Results.NotFound();
+    var requester = await db.Users.SingleOrDefaultAsync(item => item.Id == connection.RequesterId, ct);
+    var request = await db.SupportRequests.SingleOrDefaultAsync(item => item.Id == connection.RequestId, ct);
+    if (requester is null || request is null) return Results.NotFound();
+    var skills = await db.SkillProfiles.Where(item => item.UserId == requester.Id && item.Visible).OrderByDescending(item => item.Confidence).Take(12).Select(item => new { item.Topic, item.Type, item.Confidence }).ToListAsync(ct);
+    var availability = await db.Availabilities.Where(item => item.UserId == requester.Id).Select(item => new { item.TimeSlots, item.PreferredMode }).SingleOrDefaultAsync(ct);
+    var ratingRows = await db.Ratings.Where(item => item.EvaluatedUserId == requester.Id).Select(item => new { item.Usefulness, item.Clarity, item.Fulfillment, item.Respect }).ToListAsync(ct);
+    var average = ratingRows.Count == 0 ? 0 : Math.Round(ratingRows.Average(item => (item.Usefulness + item.Clarity + item.Fulfillment + item.Respect) / 4d), 2);
+    return Results.Ok(new
+    {
+        connectionId = connection.Id,
+        request = new { request.Topic, request.Description, request.HelpType, request.DesiredSchedule, request.CreatedAt },
+        person = new { requester.Id, requester.DisplayName, requester.Career, requester.AcademicTerm, requester.CreatedAt, requester.AvatarUpdatedAt },
+        skills,
+        availability,
+        reputation = new { average, totalRatings = ratingRows.Count }
+    });
 });
 connections.MapPost("/{id:guid}/responder", async (Guid id, ConnectionResponse input, ClaimsPrincipal p, ConectaMentesDbContext db, IHubContext<RealtimeHub> hub) =>
 {
@@ -607,10 +662,19 @@ async Task EnsureColumnAsync(ConectaMentesDbContext db, string tableName, string
         ("Users", "AccessStatus") => "ALTER TABLE `Users` ADD COLUMN `AccessStatus` varchar(20) NOT NULL DEFAULT 'active';",
         ("Users", "AccessStatusReason") => "ALTER TABLE `Users` ADD COLUMN `AccessStatusReason` varchar(500) NULL;",
         ("Users", "AccessStatusChangedAt") => "ALTER TABLE `Users` ADD COLUMN `AccessStatusChangedAt` datetime(6) NULL;",
+        ("Users", "AvatarPath") => "ALTER TABLE `Users` ADD COLUMN `AvatarPath` varchar(260) NULL;",
+        ("Users", "AvatarUpdatedAt") => "ALTER TABLE `Users` ADD COLUMN `AvatarUpdatedAt` datetime(6) NULL;",
         _ => throw new InvalidOperationException("Cambio de esquema no permitido.")
     };
     await db.Database.ExecuteSqlRawAsync(statement);
 }
+
+string GetAvatarContentType(string path) => Path.GetExtension(path).ToLowerInvariant() switch
+{
+    ".jpg" or ".jpeg" => "image/jpeg",
+    ".webp" => "image/webp",
+    _ => "image/png"
+};
 
 async Task EnsureAdminRootAsync(ConectaMentesDbContext db, IConfiguration configuration)
 {
@@ -648,6 +712,7 @@ app.Run();
 public partial class Program;
 
 public sealed record RegisterRequest(string Email, string Password, string DisplayName, string Career, string AcademicTerm);
+public sealed record ProfileUpdateRequest(string DisplayName, string Career, string AcademicTerm);
 public sealed record LoginRequest(string Email, string Password);
 public sealed record GoogleLoginRequest(string Credential);
 public sealed record SkillRequest(string Topic, SkillType Type, int Confidence, bool Visible = true);
