@@ -9,6 +9,8 @@ const MAX_CHAT_FILE_BYTES = 10 * 1024 * 1024;
 const CHAT_FILE_ACCEPT = '.jpg,.jpeg,.png,.webp,.gif,.pdf,.docx,.xlsx,.pptx,.txt';
 const DO_LOCALE = 'es-DO';
 const DO_TIME_ZONE = 'America/Santo_Domingo';
+const PWA_VERSION = new URL(import.meta.url).pathname.split('/').pop() ?? 'app';
+const APPLIED_WORKER_KEY = 'conectamentes_applied_worker';
 type Mode = 'welcome' | 'login' | 'register' | 'recover';
 type Tab = 'inicio' | 'perfil' | 'solicitudes' | 'coincidencias' | 'mensajes' | 'ranking' | 'agenda' | 'seguridad' | 'panel' | 'admin';
 type IconName = 'home' | 'profile' | 'request' | 'match' | 'message' | 'bell' | 'search' | 'calendar' | 'shield' | 'chart' | 'star' | 'more';
@@ -221,10 +223,15 @@ function usePwaUpdate() {
     if (!('serviceWorker' in navigator)) return;
     let registration: ServiceWorkerRegistration | null = null; let interval = 0; let reloading = false;
     const reloadOnce = () => { if (reloading) return; reloading = true; if (reloadTimer.current) window.clearTimeout(reloadTimer.current); location.reload(); };
-    const revealUpdate = () => { if (!updateRequested.current && registration?.waiting?.state === 'installed') setWaitingWorker(registration.waiting); };
+    const revealUpdate = () => {
+      const worker = registration?.waiting;
+      if (!worker || worker.state !== 'installed' || updateRequested.current) return;
+      if (localStorage.getItem(APPLIED_WORKER_KEY) === worker.scriptURL) { worker.postMessage({ type: 'SKIP_WAITING' }); return; }
+      setWaitingWorker(worker);
+    };
     const updateFound = () => { const worker = registration?.installing; worker?.addEventListener('statechange', () => { if (worker.state === 'installed' && navigator.serviceWorker.controller) revealUpdate(); }); };
     navigator.serviceWorker.addEventListener('controllerchange', reloadOnce);
-    navigator.serviceWorker.register('/sw.js').then(current => { registration = current; revealUpdate(); current.addEventListener('updatefound', updateFound); current.update().then(revealUpdate).catch(() => undefined); interval = window.setInterval(() => current.update(), 5 * 60 * 1000); }).catch(() => undefined);
+    navigator.serviceWorker.register(`/sw.js?v=${PWA_VERSION}`, { updateViaCache: 'none' }).then(current => { registration = current; revealUpdate(); current.addEventListener('updatefound', updateFound); current.update().then(revealUpdate).catch(() => undefined); interval = window.setInterval(() => current.update(), 5 * 60 * 1000); }).catch(() => undefined);
     return () => { if (interval) window.clearInterval(interval); if (reloadTimer.current) window.clearTimeout(reloadTimer.current); registration?.removeEventListener('updatefound', updateFound); navigator.serviceWorker.removeEventListener('controllerchange', reloadOnce); };
   }, []);
   function applyUpdate() {
@@ -232,6 +239,7 @@ function usePwaUpdate() {
     updateRequested.current = true;
     setUpdating(true);
     const worker = waitingWorker;
+    localStorage.setItem(APPLIED_WORKER_KEY, worker.scriptURL);
     setWaitingWorker(null);
     worker.postMessage({ type: 'SKIP_WAITING' });
     reloadTimer.current = window.setTimeout(() => location.reload(), 4000);
