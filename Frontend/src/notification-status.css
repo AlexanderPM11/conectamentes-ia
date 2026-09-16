@@ -1,0 +1,19 @@
+.device-alerts{transition:transform .18s ease,opacity .18s ease}
+.device-alerts:not(:disabled):hover{transform:translateY(-1px)}
+.device-alerts:disabled{cursor:wait;opacity:.78}
+.device-alerts>span{display:grid;flex:1;gap:2px}
+.device-alerts>b{color:#f2ad8f;font-size:1.4rem;font-weight:400}
+.device-alerts-status{cursor:default}
+.device-alerts-status.active{color:var(--forest);background:#e6f1e7}
+.device-alerts-status.active small{color:#607a6d}
+.device-alerts-status.blocked{color:#6f4525;background:#fff0dc}
+.device-alerts-status.blocked small{color:#8e6d50}
+.device-alerts-status.unsupported{color:#415d5a;background:#edf0ed}
+.device-alerts-status.unsupported small{color:#6e817b}
+.device-status-icon{display:grid!important;width:29px;height:29px;flex:0 0 29px!important;place-items:center;border-radius:50%;color:#fff;background:var(--forest);font-weight:800}
+.blocked .device-status-icon{background:var(--clay)}
+.unsupported .device-status-icon{background:#78928b}
+.permission-feedback{margin:-3px 2px 12px;color:var(--muted);font-size:.72rem;line-height:1.4}
+.permission-feedback.active{color:#39724b}
+.permission-feedback.blocked{color:#9b542f}
+.permission-retry{align-self:flex-start;margin:-4px 0 12px;padding:0 2px;border:0;color:var(--clay);background:transparent;font-size:.72rem;font-weight:800}

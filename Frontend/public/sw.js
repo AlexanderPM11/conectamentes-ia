@@ -1,4 +1,4 @@
-const CACHE = 'conectamente-shell-v28';
+const CACHE = 'conectamente-shell-v29';
 const SHELL = ['/', '/index.html', '/manifest.json', '/offline.html', '/icons/icon-180.png', '/icons/icon-192.png', '/icons/icon-512.png'];
 self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL))));
 self.addEventListener('message', event => { if (event.data?.type === 'SKIP_WAITING') self.skipWaiting(); });

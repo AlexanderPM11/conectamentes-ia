@@ -7,7 +7,7 @@
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#f6f3ed",
-  "theme_color": "#193b36",
+  "theme_color": "#d95f42",
   "description": "Apoyo académico entre estudiantes universitarios.",
   "categories": ["education", "social"],
   "icons": [

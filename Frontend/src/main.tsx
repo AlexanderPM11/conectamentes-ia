@@ -323,8 +323,33 @@ function NotificationButton({ count, onClick }: { count: number; onClick: () => 
 
 function NotificationsPanel({ items, onClose, onOpen, onMarkAll }: any) {
   const permission = 'Notification' in window ? window.Notification.permission : 'unsupported';
-  async function enableDeviceAlerts() { if ('Notification' in window) await window.Notification.requestPermission(); }
-  return <div className="notifications-backdrop" onClick={onClose}><aside className="notifications-panel" onClick={event => event.stopPropagation()}><div className="notifications-head"><div><p className="eyebrow">ACTIVIDAD</p><h2>Notificaciones</h2></div><button className="close-button" onClick={onClose}>×</button></div>{permission === 'default' && <button className="device-alerts" onClick={enableDeviceAlerts}><Icon name="bell" /><span><strong>Activar avisos del dispositivo</strong><small>Recibe alertas aunque estés en otra pantalla.</small></span></button>}<div className="notification-list">{items.length ? items.map((item: any) => <button key={item.id} className={item.isRead ? 'notification-item' : 'notification-item unread'} onClick={() => onOpen(item)}><span className="notification-icon"><Icon name={item.type === 'message' || item.type === 'comment' ? 'message' : item.type === 'session' ? 'calendar' : 'match'} /></span><span><strong>{item.title}</strong><small>{item.body}</small><time>{formatRelative(item.createdAt)}</time></span>{!item.isRead && <i />}</button>) : <EmptyState title="Todo al día" text="Aquí verás solicitudes, mensajes, sesiones y comentarios." badge="network" />}</div>{items.some((item: any) => !item.isRead) && <button className="mark-all" onClick={onMarkAll}>Marcar todo como leído</button>}</aside></div>;
+  const [devicePermission, setDevicePermission] = useState(permission);
+  const [permissionMessage, setPermissionMessage] = useState('');
+  const [requestingPermission, setRequestingPermission] = useState(false);
+  async function enableDeviceAlerts() {
+    if (!('Notification' in window)) {
+      setDevicePermission('unsupported');
+      setPermissionMessage('Este navegador no admite avisos del dispositivo. Seguirás viendo las notificaciones dentro de la aplicación.');
+      return;
+    }
+    setRequestingPermission(true);
+    setPermissionMessage('Estamos solicitando permiso al dispositivo…');
+    try {
+      const nextPermission = await window.Notification.requestPermission();
+      setDevicePermission(nextPermission);
+      setPermissionMessage(nextPermission === 'granted'
+        ? 'Listo. Recibirás avisos aunque estés en otra pantalla.'
+        : nextPermission === 'denied'
+          ? 'Los avisos están bloqueados. Puedes activarlos desde los permisos del navegador.'
+          : 'No se activaron los avisos. Puedes intentarlo nuevamente cuando quieras.');
+    } catch {
+      setPermissionMessage('No pudimos activar los avisos en este momento. Inténtalo nuevamente.');
+    } finally {
+      setRequestingPermission(false);
+    }
+  }
+  const status = devicePermission === 'granted' ? 'active' : devicePermission === 'denied' ? 'blocked' : devicePermission === 'unsupported' ? 'unsupported' : 'idle';
+  return <div className="notifications-backdrop" onClick={onClose}><aside className="notifications-panel" onClick={event => event.stopPropagation()}><div className="notifications-head"><div><p className="eyebrow">ACTIVIDAD</p><h2>Notificaciones</h2></div><button className="close-button" onClick={onClose}>×</button></div>{status === 'idle' && <button className="device-alerts" onClick={enableDeviceAlerts} disabled={requestingPermission}><Icon name="bell" /><span><strong>{requestingPermission ? 'Activando avisos…' : 'Activar avisos del dispositivo'}</strong><small>Recibe alertas aunque estés en otra pantalla.</small></span><b aria-hidden="true">›</b></button>}{status === 'active' && <div className="device-alerts device-alerts-status active" role="status"><span className="device-status-icon">✓</span><span><strong>Avisos activos</strong><small>Te avisaremos cuando recibas una solicitud, mensaje o comentario.</small></span></div>}{status === 'blocked' && <div className="device-alerts device-alerts-status blocked" role="alert"><span className="device-status-icon">!</span><span><strong>Avisos bloqueados</strong><small>Actívalos desde los permisos del navegador para recibir alertas fuera de la aplicación.</small></span></div>}{status === 'unsupported' && <div className="device-alerts device-alerts-status unsupported" role="status"><span className="device-status-icon">i</span><span><strong>Avisos no disponibles</strong><small>Este navegador no admite avisos del dispositivo, pero tus notificaciones seguirán aquí.</small></span></div>}{permissionMessage && status === 'idle' && <p className="permission-feedback" role="status">{permissionMessage}</p>}{permissionMessage && status !== 'idle' && <p className={`permission-feedback ${status}`} role={status === 'blocked' ? 'alert' : 'status'}>{permissionMessage}</p>}{status === 'blocked' && <button className="permission-retry" onClick={enableDeviceAlerts}>Volver a comprobar</button>}<div className="notification-list">{items.length ? items.map((item: any) => <button key={item.id} className={item.isRead ? 'notification-item' : 'notification-item unread'} onClick={() => onOpen(item)}><span className="notification-icon"><Icon name={item.type === 'message' || item.type === 'comment' ? 'message' : item.type === 'session' ? 'calendar' : 'match'} /></span><span><strong>{item.title}</strong><small>{item.body}</small><time>{formatRelative(item.createdAt)}</time></span>{!item.isRead && <i />}</button>) : <EmptyState title="Todo al día" text="Aquí verás solicitudes, mensajes, sesiones y comentarios." badge="network" />}</div>{items.some((item: any) => !item.isRead) && <button className="mark-all" onClick={onMarkAll}>Marcar todo como leído</button>}</aside></div>;
 }
 
 function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCancel }: { title: string; message: string; confirmLabel: string; onConfirm: () => void; onCancel: () => void }) {
