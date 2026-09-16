@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import './styles.css';
 
-const API = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
+const API = import.meta.env.VITE_API_URL || '';
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
 const MAX_CHAT_FILE_BYTES = 10 * 1024 * 1024;
 const CHAT_FILE_ACCEPT = '.jpg,.jpeg,.png,.webp,.gif,.pdf,.docx,.xlsx,.pptx,.txt';

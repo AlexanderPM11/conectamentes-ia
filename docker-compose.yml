@@ -11,6 +11,8 @@ services:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     expose:
       - "3306"
+    networks:
+      - app_network
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
@@ -49,20 +51,30 @@ services:
     volumes:
       - chat_uploads:/app/data/chat-uploads
       - api_keys:/root/.aspnet/DataProtection-Keys
+    networks:
+      - app_network
 
   frontend:
     build:
       context: ./Frontend
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
+        VITE_API_URL: ${VITE_API_URL:-}
         VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID}
     restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
     expose:
       - "80"
     depends_on:
       - api
+    networks:
+      - app_network
 
 volumes:
   mysql_data:
   chat_uploads:
   api_keys:
+
+networks:
+  app_network:
+    driver: bridge
