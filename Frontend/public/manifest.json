@@ -11,7 +11,9 @@
   "description": "Apoyo académico entre estudiantes universitarios.",
   "categories": ["education", "social"],
   "icons": [
-    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "/icons/icon-192.png?v=20260916-2", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png?v=20260916-2", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-192.png?v=20260916-2-maskable", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/icon-512.png?v=20260916-2-maskable", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
