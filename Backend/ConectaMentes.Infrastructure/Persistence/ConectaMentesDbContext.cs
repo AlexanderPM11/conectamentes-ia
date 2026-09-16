@@ -17,6 +17,7 @@ public sealed class ConectaMentesDbContext(DbContextOptions<ConectaMentesDbConte
     public DbSet<Block> Blocks => Set<Block>();
     public DbSet<Report> Reports => Set<Report>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<PushSubscriptionRecord> PushSubscriptions => Set<PushSubscriptionRecord>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
     public DbSet<ChatAttachment> ChatAttachments => Set<ChatAttachment>();
 
@@ -44,6 +45,16 @@ public sealed class ConectaMentesDbContext(DbContextOptions<ConectaMentesDbConte
             entity.Property(item => item.Type).HasMaxLength(40).IsRequired();
             entity.Property(item => item.Title).HasMaxLength(140).IsRequired();
             entity.Property(item => item.Body).HasMaxLength(500).IsRequired();
+        });
+        modelBuilder.Entity<PushSubscriptionRecord>(entity =>
+        {
+            entity.HasKey(item => item.Id);
+            entity.HasIndex(item => item.EndpointHash).IsUnique();
+            entity.HasIndex(item => item.UserId);
+            entity.Property(item => item.EndpointHash).HasMaxLength(64).IsRequired();
+            entity.Property(item => item.Endpoint).HasMaxLength(2048).IsRequired();
+            entity.Property(item => item.P256dh).HasMaxLength(256).IsRequired();
+            entity.Property(item => item.Auth).HasMaxLength(128).IsRequired();
         });
         modelBuilder.Entity<ChatMessage>(entity =>
         {

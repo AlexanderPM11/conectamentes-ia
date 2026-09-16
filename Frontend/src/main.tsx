@@ -34,6 +34,34 @@ async function api(path: string, options: RequestInit = {}) {
   return response.status === 204 ? null : response.json();
 }
 
+function urlBase64ToUint8Array(value: string) {
+  const padding = '='.repeat((4 - value.length % 4) % 4);
+  const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = window.atob(base64);
+  return Uint8Array.from([...raw].map(character => character.charCodeAt(0)));
+}
+
+async function subscribeDevicePush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) throw new Error('Este dispositivo no admite notificaciones con la aplicación cerrada.');
+  const registration = await navigator.serviceWorker.ready;
+  const { publicKey } = await api('/api/push/public-key');
+  let subscription = await registration.pushManager.getSubscription();
+  if (!subscription) subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey) });
+  const value = subscription.toJSON();
+  if (!value.endpoint || !value.keys?.p256dh || !value.keys?.auth) throw new Error('El dispositivo no entregó una suscripción válida.');
+  await api('/api/push/subscriptions', { method: 'POST', body: JSON.stringify({ endpoint: value.endpoint, keys: value.keys }) });
+  return subscription;
+}
+
+async function unsubscribeDevicePush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  const registration = await navigator.serviceWorker.ready;
+  const subscription = await registration.pushManager.getSubscription();
+  if (!subscription) return;
+  try { await api('/api/push/subscriptions', { method: 'DELETE', body: JSON.stringify({ endpoint: subscription.endpoint }) }); } catch { /* El cierre de sesión debe continuar aunque el servidor no responda. */ }
+  await subscription.unsubscribe();
+}
+
 let googleIdentityPromise: Promise<void> | null = null;
 function ensureGoogleIdentityScript() {
   if ((window as any).google?.accounts) return Promise.resolve();
@@ -108,7 +136,6 @@ function App() {
     const realtime = new HubConnectionBuilder().withUrl(API + '/hubs/realtime', { accessTokenFactory: () => token }).withAutomaticReconnect().configureLogging(LogLevel.Warning).build();
     realtime.on('NotificationReceived', item => {
       setNotifications(current => current.some(entry => entry.id === item.id) ? current : [item, ...current]);
-      if ('Notification' in window && window.Notification.permission === 'granted') new window.Notification(item.title, { body: item.body, icon: '/icons/icon-192.png' });
     });
     realtime.on('ChatMessageReceived', item => setMessagesByConnection(current => ({ ...current, [item.connectionId]: mergeMessage(current[item.connectionId] ?? [], { ...item, isMine: item.senderId === me?.id }) })));
     realtime.onreconnecting(() => setRealtimeConnected(false));
@@ -117,8 +144,28 @@ function App() {
     realtime.start().then(() => setRealtimeConnected(true)).catch(() => setRealtimeConnected(false));
     return () => { realtime.stop(); };
   }, [logged, me?.id]);
-  function showError(error: unknown) { if (error instanceof Error && error.message === 'Tu sesión ha expirado.') { localStorage.removeItem('conectamente_token'); setMe(null); setLogged(false); setMode('login'); setTab('inicio'); setNotice(error.message); return; } setNotice(error instanceof Error ? error.message : 'Ocurrió un error.'); }
-  function signOut() { localStorage.removeItem('conectamente_token'); setMe(null); setLogged(false); setMode('welcome'); setTab('inicio'); }
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const receivePush = (event: MessageEvent) => {
+      if (event.data?.type !== 'PUSH_NOTIFICATION' || !event.data.payload) return;
+      const item = event.data.payload;
+      setNotifications(current => current.some(entry => entry.id === item.id) ? current : [item, ...current]);
+    };
+    navigator.serviceWorker.addEventListener('message', receivePush);
+    return () => navigator.serviceWorker.removeEventListener('message', receivePush);
+  }, []);
+  useEffect(() => {
+    if (!logged) return;
+    const params = new URLSearchParams(window.location.search);
+    const destination = params.get('push');
+    const referenceId = params.get('referenceId');
+    if (!destination) return;
+    if (destination === 'mensajes') { if (referenceId) setChatConnectionId(referenceId); setTab('mensajes'); }
+    else if (['inicio', 'agenda', 'ranking'].includes(destination)) setTab(destination as Tab);
+    window.history.replaceState({}, '', window.location.pathname);
+  }, [logged]);
+  function showError(error: unknown) { if (error instanceof Error && error.message === 'Tu sesión ha expirado.') { unsubscribeDevicePush().catch(() => undefined); localStorage.removeItem('conectamente_token'); setMe(null); setLogged(false); setMode('login'); setTab('inicio'); setNotice(error.message); return; } setNotice(error instanceof Error ? error.message : 'Ocurrió un error.'); }
+  async function signOut() { await unsubscribeDevicePush(); localStorage.removeItem('conectamente_token'); setMe(null); setLogged(false); setMode('welcome'); setTab('inicio'); }
 
   async function authSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setNotice('');
@@ -338,12 +385,20 @@ function NotificationButton({ count, onClick }: { count: number; onClick: () => 
 function NotificationsPanel({ items, onClose, onOpen, onMarkAll }: any) {
   const permission = 'Notification' in window ? window.Notification.permission : 'unsupported';
   const [devicePermission, setDevicePermission] = useState(permission);
+  const [pushActive, setPushActive] = useState(false);
+  const [checkingSubscription, setCheckingSubscription] = useState(permission === 'granted');
   const [permissionMessage, setPermissionMessage] = useState('');
   const [requestingPermission, setRequestingPermission] = useState(false);
+  useEffect(() => {
+    let active = true;
+    if (permission !== 'granted' || !('serviceWorker' in navigator) || !('PushManager' in window)) { setCheckingSubscription(false); return; }
+    navigator.serviceWorker.ready.then(registration => registration.pushManager.getSubscription()).then(subscription => { if (active) setPushActive(Boolean(subscription)); }).catch(() => undefined).finally(() => { if (active) setCheckingSubscription(false); });
+    return () => { active = false; };
+  }, []);
   async function enableDeviceAlerts() {
-    if (!('Notification' in window)) {
+    if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
       setDevicePermission('unsupported');
-      setPermissionMessage('Este navegador no admite avisos del dispositivo. Seguirás viendo las notificaciones dentro de la aplicación.');
+      setPermissionMessage('Este dispositivo no admite avisos con la aplicación cerrada. En iPhone debes instalar la PWA en la pantalla de inicio y usar iOS 16.4 o superior.');
       return;
     }
     setRequestingPermission(true);
@@ -351,19 +406,26 @@ function NotificationsPanel({ items, onClose, onOpen, onMarkAll }: any) {
     try {
       const nextPermission = await window.Notification.requestPermission();
       setDevicePermission(nextPermission);
-      setPermissionMessage(nextPermission === 'granted'
-        ? 'Listo. Recibirás avisos aunque estés en otra pantalla.'
-        : nextPermission === 'denied'
+      if (nextPermission === 'granted') {
+        await subscribeDevicePush();
+        setPushActive(true);
+        setPermissionMessage('Listo. Este dispositivo recibirá solicitudes y mensajes aunque la aplicación esté cerrada.');
+      } else {
+        setPushActive(false);
+        setPermissionMessage(nextPermission === 'denied'
           ? 'Los avisos están bloqueados. Puedes activarlos desde los permisos del navegador.'
           : 'No se activaron los avisos. Puedes intentarlo nuevamente cuando quieras.');
-    } catch {
-      setPermissionMessage('No pudimos activar los avisos en este momento. Inténtalo nuevamente.');
+      }
+    } catch (error) {
+      setPushActive(false);
+      setPermissionMessage(error instanceof Error ? error.message : 'No pudimos activar los avisos en este momento. Inténtalo nuevamente.');
     } finally {
       setRequestingPermission(false);
     }
   }
-  const status = devicePermission === 'granted' ? 'active' : devicePermission === 'denied' ? 'blocked' : devicePermission === 'unsupported' ? 'unsupported' : 'idle';
-  return <div className="notifications-backdrop" onClick={onClose}><aside className="notifications-panel" onClick={event => event.stopPropagation()}><div className="notifications-head"><div><p className="eyebrow">ACTIVIDAD</p><h2>Notificaciones</h2></div><button className="close-button" onClick={onClose}>×</button></div>{status === 'idle' && <button className="device-alerts" onClick={enableDeviceAlerts} disabled={requestingPermission}><Icon name="bell" /><span><strong>{requestingPermission ? 'Activando avisos…' : 'Activar avisos del dispositivo'}</strong><small>Recibe alertas aunque estés en otra pantalla.</small></span><b aria-hidden="true">›</b></button>}{status === 'active' && <div className="device-alerts device-alerts-status active" role="status"><span className="device-status-icon">✓</span><span><strong>Avisos activos</strong><small>Te avisaremos cuando recibas una solicitud, mensaje o comentario.</small></span></div>}{status === 'blocked' && <div className="device-alerts device-alerts-status blocked" role="alert"><span className="device-status-icon">!</span><span><strong>Avisos bloqueados</strong><small>Actívalos desde los permisos del navegador para recibir alertas fuera de la aplicación.</small></span></div>}{status === 'unsupported' && <div className="device-alerts device-alerts-status unsupported" role="status"><span className="device-status-icon">i</span><span><strong>Avisos no disponibles</strong><small>Este navegador no admite avisos del dispositivo, pero tus notificaciones seguirán aquí.</small></span></div>}{permissionMessage && status === 'idle' && <p className="permission-feedback" role="status">{permissionMessage}</p>}{permissionMessage && status !== 'idle' && <p className={`permission-feedback ${status}`} role={status === 'blocked' ? 'alert' : 'status'}>{permissionMessage}</p>}{status === 'blocked' && <button className="permission-retry" onClick={enableDeviceAlerts}>Volver a comprobar</button>}<div className="notification-list">{items.length ? items.map((item: any) => <button key={item.id} className={item.isRead ? 'notification-item' : 'notification-item unread'} onClick={() => onOpen(item)}><span className="notification-icon"><Icon name={item.type === 'message' || item.type === 'comment' ? 'message' : item.type === 'session' ? 'calendar' : 'match'} /></span><span><strong>{item.title}</strong><small>{item.body}</small><time>{formatRelative(item.createdAt)}</time></span>{!item.isRead && <i />}</button>) : <EmptyState title="Todo al día" text="Aquí verás solicitudes, mensajes, sesiones y comentarios." badge="network" />}</div>{items.some((item: any) => !item.isRead) && <button className="mark-all" onClick={onMarkAll}>Marcar todo como leído</button>}</aside></div>;
+  const supportsPush = 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window;
+  const status = !supportsPush || devicePermission === 'unsupported' ? 'unsupported' : devicePermission === 'denied' ? 'blocked' : devicePermission === 'granted' && pushActive ? 'active' : 'idle';
+  return <div className="notifications-backdrop" onClick={onClose}><aside className="notifications-panel" onClick={event => event.stopPropagation()}><div className="notifications-head"><div><p className="eyebrow">ACTIVIDAD</p><h2>Notificaciones</h2></div><button className="close-button" onClick={onClose}>×</button></div>{status === 'idle' && <button className="device-alerts" onClick={enableDeviceAlerts} disabled={requestingPermission || checkingSubscription}><Icon name="bell" /><span><strong>{requestingPermission ? 'Activando avisos…' : checkingSubscription ? 'Comprobando dispositivo…' : devicePermission === 'granted' ? 'Completar activación' : 'Activar avisos del dispositivo'}</strong><small>Recibe alertas aunque la PWA esté cerrada.</small></span><b aria-hidden="true">›</b></button>}{status === 'active' && <div className="device-alerts device-alerts-status active" role="status"><span className="device-status-icon">✓</span><span><strong>Avisos activos en este dispositivo</strong><small>Recibirás solicitudes, mensajes y comentarios incluso con la aplicación cerrada.</small></span></div>}{status === 'blocked' && <div className="device-alerts device-alerts-status blocked" role="alert"><span className="device-status-icon">!</span><span><strong>Avisos bloqueados</strong><small>Actívalos desde los permisos del navegador o del sistema.</small></span></div>}{status === 'unsupported' && <div className="device-alerts device-alerts-status unsupported" role="status"><span className="device-status-icon">i</span><span><strong>Avisos no disponibles</strong><small>En iPhone instala la PWA en la pantalla de inicio y usa iOS 16.4 o superior.</small></span></div>}{permissionMessage && <p className={`permission-feedback ${status}`} role={status === 'blocked' ? 'alert' : 'status'}>{permissionMessage}</p>}{status === 'blocked' && <button className="permission-retry" onClick={enableDeviceAlerts}>Volver a comprobar</button>}<div className="notification-list">{items.length ? items.map((item: any) => <button key={item.id} className={item.isRead ? 'notification-item' : 'notification-item unread'} onClick={() => onOpen(item)}><span className="notification-icon"><Icon name={item.type === 'message' || item.type === 'comment' ? 'message' : item.type === 'session' ? 'calendar' : 'match'} /></span><span><strong>{item.title}</strong><small>{item.body}</small><time>{formatRelative(item.createdAt)}</time></span>{!item.isRead && <i />}</button>) : <EmptyState title="Todo al día" text="Aquí verás solicitudes, mensajes, sesiones y comentarios." badge="network" />}</div>{items.some((item: any) => !item.isRead) && <button className="mark-all" onClick={onMarkAll}>Marcar todo como leído</button>}</aside></div>;
 }
 
 function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCancel }: { title: string; message: string; confirmLabel: string; onConfirm: () => void; onCancel: () => void }) {

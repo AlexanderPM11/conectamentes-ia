@@ -32,6 +32,7 @@ builder.Services.AddSingleton<ChatAttachmentStorage>();
 builder.Services.AddSingleton<ProfileAvatarStorage>();
 builder.Services.AddHttpClient("GoogleCalendar", client => client.BaseAddress = new Uri("https://www.googleapis.com/"));
 builder.Services.AddScoped<GoogleCalendarService>();
+builder.Services.AddScoped<DevicePushService>();
 builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -104,6 +105,19 @@ using (var scope = app.Services.CreateScope())
           `SizeBytes` bigint NOT NULL,
           `CreatedAt` datetime(6) NOT NULL,
           PRIMARY KEY (`Id`), UNIQUE INDEX `IX_ChatAttachments_MessageId` (`MessageId`), INDEX `IX_ChatAttachments_ConnectionId_CreatedAt` (`ConnectionId`,`CreatedAt`)
+        );
+        """);
+    await db.Database.ExecuteSqlRawAsync("""
+        CREATE TABLE IF NOT EXISTS `PushSubscriptions` (
+          `Id` char(36) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,
+          `UserId` char(36) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,
+          `EndpointHash` varchar(64) NOT NULL,
+          `Endpoint` varchar(2048) NOT NULL,
+          `P256dh` varchar(256) NOT NULL,
+          `Auth` varchar(128) NOT NULL,
+          `CreatedAt` datetime(6) NOT NULL,
+          `UpdatedAt` datetime(6) NOT NULL,
+          PRIMARY KEY (`Id`), UNIQUE INDEX `IX_PushSubscriptions_EndpointHash` (`EndpointHash`), INDEX `IX_PushSubscriptions_UserId` (`UserId`)
         );
         """);
     await EnsureColumnAsync(db, "Sessions", "MeetUrl");
@@ -202,6 +216,32 @@ profile.MapPut("/avatar", async (IFormFile file, ClaimsPrincipal p, ConectaMente
     }
     catch (AvatarValidationException ex) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["avatar"] = [ex.Message] }); }
 }).DisableAntiforgery().WithName("UpdateProfileAvatar").WithOpenApi();
+
+var pushEndpoints = secured.MapGroup("/push").WithTags("Notificaciones push");
+pushEndpoints.MapGet("/public-key", (DevicePushService devicePush) => devicePush.PublicKey is { } key
+    ? Results.Ok(new { publicKey = key })
+    : Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: "Notificaciones push no configuradas"));
+pushEndpoints.MapPost("/subscriptions", async (PushSubscriptionInput input, ClaimsPrincipal principal, DevicePushService devicePush, CancellationToken ct) =>
+{
+    try
+    {
+        await devicePush.SaveSubscriptionAsync(ApiIdentity.UserId(principal), input.Endpoint, input.Keys.P256dh, input.Keys.Auth, ct);
+        return Results.NoContent();
+    }
+    catch (ArgumentException exception)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]> { ["subscription"] = [exception.Message] });
+    }
+    catch (InvalidOperationException exception)
+    {
+        return Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: "Notificaciones push no configuradas", detail: exception.Message);
+    }
+});
+pushEndpoints.MapDelete("/subscriptions", async ([FromBody] PushUnsubscribeInput input, ClaimsPrincipal principal, DevicePushService devicePush, CancellationToken ct) =>
+{
+    await devicePush.RemoveSubscriptionAsync(ApiIdentity.UserId(principal), input.Endpoint, ct);
+    return Results.NoContent();
+});
 profile.MapPost("/habilidades", async (SkillRequest request, ClaimsPrincipal p, ConectaMentesDbContext db) => { if (request.Confidence is < 1 or > 5) return Results.ValidationProblem(new Dictionary<string, string[]> { ["confidence"] = ["Debe estar entre 1 y 5."] }); var item = new SkillProfile { UserId = ApiIdentity.UserId(p), Topic = request.Topic.Trim(), Type = request.Type, Confidence = request.Confidence, Visible = request.Visible }; db.SkillProfiles.Add(item); await db.SaveChangesAsync(); return Results.Created($"/api/perfil/habilidades/{item.Id}", item); });
 profile.MapPut("/habilidades/{id:guid}", async (Guid id, SkillRequest request, ClaimsPrincipal p, ConectaMentesDbContext db) => { if (string.IsNullOrWhiteSpace(request.Topic) || request.Confidence is < 1 or > 5) return Results.ValidationProblem(new Dictionary<string, string[]> { ["skill"] = ["Indica un tema y una confianza entre 1 y 5."] }); var item = await db.SkillProfiles.SingleOrDefaultAsync(x => x.Id == id && x.UserId == ApiIdentity.UserId(p)); if (item is null) return Results.NotFound(); item.Topic = request.Topic.Trim(); item.Type = request.Type; item.Confidence = request.Confidence; item.Visible = request.Visible; await db.SaveChangesAsync(); return Results.Ok(item); });
 profile.MapDelete("/habilidades/{id:guid}", async (Guid id, ClaimsPrincipal p, ConectaMentesDbContext db) => { var item = await db.SkillProfiles.SingleOrDefaultAsync(x => x.Id == id && x.UserId == ApiIdentity.UserId(p)); if (item is null) return Results.NotFound(); db.Remove(item); await db.SaveChangesAsync(); return Results.NoContent(); });
@@ -247,7 +287,7 @@ app.MapGet("/api/descubrimiento", async (string? topic, string? type, ClaimsPrin
 }).RequireAuthorization().WithTags("Descubrimiento");
 var matchActions = secured.MapGroup("/coincidencias").WithTags("Coincidencias");
 matchActions.MapPost("/{id:guid}/rechazar", async (Guid id, ClaimsPrincipal p, ConectaMentesDbContext db) => await db.Matches.SingleOrDefaultAsync(x => x.Id == id) is { } item ? await RejectMatch(item, p, db) : Results.NotFound());
-matchActions.MapPost("/{id:guid}/aceptar", async (Guid id, ClaimsPrincipal p, ConectaMentesDbContext db, IHubContext<RealtimeHub> hub) =>
+matchActions.MapPost("/{id:guid}/aceptar", async (Guid id, ClaimsPrincipal p, ConectaMentesDbContext db, IHubContext<RealtimeHub> hub, DevicePushService devicePush) =>
 {
     var item = await db.Matches.SingleOrDefaultAsync(x => x.Id == id);
     if (item is null) return Results.NotFound();
@@ -261,7 +301,7 @@ matchActions.MapPost("/{id:guid}/aceptar", async (Guid id, ClaimsPrincipal p, Co
     var notification = NewNotification(item.CandidateUserId, "connection_request", "Nueva solicitud de conexión", $"{requesterName} quiere aprender contigo sobre {request.Topic}.", connection.Id);
     db.AddRange(connection, notification);
     await db.SaveChangesAsync();
-    await PushNotification(notification, hub);
+    await PushNotification(notification, hub, devicePush);
     return Results.Ok(connection);
 });
 
@@ -305,7 +345,7 @@ connections.MapGet("/{id:guid}/solicitante", async (Guid id, ClaimsPrincipal p, 
         reputation = new { average, totalRatings = ratingRows.Count }
     });
 });
-connections.MapPost("/{id:guid}/responder", async (Guid id, ConnectionResponse input, ClaimsPrincipal p, ConectaMentesDbContext db, IHubContext<RealtimeHub> hub) =>
+connections.MapPost("/{id:guid}/responder", async (Guid id, ConnectionResponse input, ClaimsPrincipal p, ConectaMentesDbContext db, IHubContext<RealtimeHub> hub, DevicePushService devicePush) =>
 {
     var userId = ApiIdentity.UserId(p);
     var item = await db.Connections.SingleOrDefaultAsync(x => x.Id == id && x.CollaboratorId == userId);
@@ -316,10 +356,10 @@ connections.MapPost("/{id:guid}/responder", async (Guid id, ConnectionResponse i
     var notification = NewNotification(item.RequesterId, input.Accept ? "connection_accepted" : "connection_rejected", input.Accept ? "Conexión aceptada" : "Solicitud no aceptada", input.Accept ? $"{collaboratorName} aceptó ayudarte con {topic}. Ya pueden conversar." : $"{collaboratorName} no pudo aceptar la conexión sobre {topic}.", item.Id);
     db.Add(notification);
     await db.SaveChangesAsync();
-    await PushNotification(notification, hub);
+    await PushNotification(notification, hub, devicePush);
     return Results.Ok(item);
 });
-connections.MapPost("/{id:guid}/sesiones", async (Guid id, SessionInput input, ClaimsPrincipal p, ConectaMentesDbContext db, IHubContext<RealtimeHub> hub) =>
+connections.MapPost("/{id:guid}/sesiones", async (Guid id, SessionInput input, ClaimsPrincipal p, ConectaMentesDbContext db, IHubContext<RealtimeHub> hub, DevicePushService devicePush) =>
 {
     if (ValidateSessionInput(input) is { } validationError) return validationError;
     var userId = ApiIdentity.UserId(p);
@@ -331,7 +371,7 @@ connections.MapPost("/{id:guid}/sesiones", async (Guid id, SessionInput input, C
     var notification = NewNotification(recipientId, "session", "Nueva sesión propuesta", $"{senderName} propuso una sesión para el {FormatDominicanDateTime(input.Date)}: {input.Objective}.", connection.Id);
     db.AddRange(session, notification);
     await db.SaveChangesAsync();
-    await PushNotification(notification, hub);
+    await PushNotification(notification, hub, devicePush);
     return Results.Created($"/api/sesiones/{session.Id}", session);
 });
 
@@ -345,7 +385,7 @@ connections.MapGet("/{id:guid}/mensajes", async (Guid id, ClaimsPrincipal p, Con
     var attachments = await db.ChatAttachments.Where(item => messageIds.Contains(item.MessageId)).ToDictionaryAsync(item => item.MessageId);
     return Results.Ok(rows.Select(row => ChatMessageView(row.Message, row.Sender, row.Message.SenderId == userId, attachments.GetValueOrDefault(row.Message.Id))));
 });
-connections.MapPost("/{id:guid}/mensajes", async (Guid id, ChatMessageInput input, ClaimsPrincipal p, ConectaMentesDbContext db, IHubContext<RealtimeHub> hub) =>
+connections.MapPost("/{id:guid}/mensajes", async (Guid id, ChatMessageInput input, ClaimsPrincipal p, ConectaMentesDbContext db, IHubContext<RealtimeHub> hub, DevicePushService devicePush) =>
 {
     var userId = ApiIdentity.UserId(p);
     var connection = await db.Connections.SingleOrDefaultAsync(x => x.Id == id && (x.RequesterId == userId || x.CollaboratorId == userId) && x.Status == ConnectionStatus.Activa);
@@ -361,10 +401,10 @@ connections.MapPost("/{id:guid}/mensajes", async (Guid id, ChatMessageInput inpu
     await db.SaveChangesAsync();
     var messageView = ChatMessageView(message, senderName, false, null);
     await hub.Clients.Groups(RealtimeHub.UserGroup(connection.RequesterId), RealtimeHub.UserGroup(connection.CollaboratorId)).SendAsync("ChatMessageReceived", messageView);
-    await PushNotification(notification, hub);
+    await PushNotification(notification, hub, devicePush);
     return Results.Created($"/api/conexiones/{id}/mensajes/{message.Id}", ChatMessageView(message, senderName, true, null));
 });
-connections.MapPost("/{id:guid}/adjuntos", async (Guid id, HttpRequest request, ClaimsPrincipal p, ConectaMentesDbContext db, ChatAttachmentStorage storage, IHubContext<RealtimeHub> hub, CancellationToken ct) =>
+connections.MapPost("/{id:guid}/adjuntos", async (Guid id, HttpRequest request, ClaimsPrincipal p, ConectaMentesDbContext db, ChatAttachmentStorage storage, IHubContext<RealtimeHub> hub, DevicePushService devicePush, CancellationToken ct) =>
 {
     var userId = ApiIdentity.UserId(p);
     var connection = await db.Connections.SingleOrDefaultAsync(x => x.Id == id && (x.RequesterId == userId || x.CollaboratorId == userId) && x.Status == ConnectionStatus.Activa, ct);
@@ -394,7 +434,7 @@ connections.MapPost("/{id:guid}/adjuntos", async (Guid id, HttpRequest request, 
     catch { storage.Delete(stored.StoredName); throw; }
     var messageView = ChatMessageView(message, senderName, false, attachment);
     await hub.Clients.Groups(RealtimeHub.UserGroup(connection.RequesterId), RealtimeHub.UserGroup(connection.CollaboratorId)).SendAsync("ChatMessageReceived", messageView, ct);
-    await PushNotification(notification, hub);
+    await PushNotification(notification, hub, devicePush, ct);
     return Results.Created($"/api/conexiones/{id}/mensajes/{message.Id}", ChatMessageView(message, senderName, true, attachment));
 }).WithMetadata(new RequestSizeLimitAttribute(ChatAttachmentStorage.DefaultMaxBytes + 512 * 1024)).DisableAntiforgery();
 
@@ -453,7 +493,7 @@ sessions.MapPut("/{id:guid}", async (Guid id, SessionInput input, ClaimsPrincipa
 sessions.MapDelete("/{id:guid}", async (Guid id, ClaimsPrincipal p, ConectaMentesDbContext db) => await DeleteSession(id, p, db));
 sessions.MapPost("/{id:guid}/cancelar", async (Guid id, ClaimsPrincipal p, ConectaMentesDbContext db) => await SetSessionStatus(id, SessionStatus.Cancelada, p, db));
 sessions.MapPost("/{id:guid}/completar", async (Guid id, ClaimsPrincipal p, ConectaMentesDbContext db) => await SetSessionStatus(id, SessionStatus.Completada, p, db));
-sessions.MapPost("/{id:guid}/google-meet", async (Guid id, GoogleMeetRequest input, ClaimsPrincipal p, ConectaMentesDbContext db, GoogleCalendarService calendar, IHubContext<RealtimeHub> hub, CancellationToken ct) =>
+sessions.MapPost("/{id:guid}/google-meet", async (Guid id, GoogleMeetRequest input, ClaimsPrincipal p, ConectaMentesDbContext db, GoogleCalendarService calendar, IHubContext<RealtimeHub> hub, DevicePushService devicePush, CancellationToken ct) =>
 {
     var userId = ApiIdentity.UserId(p);
     var item = await (from session in db.Sessions
@@ -493,12 +533,12 @@ sessions.MapPost("/{id:guid}/google-meet", async (Guid id, GoogleMeetRequest inp
     db.AddRange(chatMessage, notification);
     await db.SaveChangesAsync(ct);
     await hub.Clients.Groups(RealtimeHub.UserGroup(item.Connection.RequesterId), RealtimeHub.UserGroup(item.Connection.CollaboratorId)).SendAsync("ChatMessageReceived", ChatMessageView(chatMessage, creator.DisplayName, false, null), ct);
-    await PushNotification(notification, hub);
+    await PushNotification(notification, hub, devicePush, ct);
     return Results.Ok(new { meetUrl = meeting.MeetUrl, calendarUrl = meeting.CalendarUrl, pending = false });
 });
 
 var ratings = secured.MapGroup("/sesiones/{sessionId:guid}/valoraciones").WithTags("Valoraciones");
-ratings.MapPost("", async (Guid sessionId, RatingInput input, ClaimsPrincipal p, ConectaMentesDbContext db, IHubContext<RealtimeHub> hub) =>
+ratings.MapPost("", async (Guid sessionId, RatingInput input, ClaimsPrincipal p, ConectaMentesDbContext db, IHubContext<RealtimeHub> hub, DevicePushService devicePush) =>
 {
     var authorId = ApiIdentity.UserId(p);
     if (input.Usefulness is < 1 or > 5 || input.Respect is < 1 or > 5 || input.Fulfillment is < 1 or > 5 || input.Clarity is < 1 or > 5)
@@ -517,7 +557,7 @@ ratings.MapPost("", async (Guid sessionId, RatingInput input, ClaimsPrincipal p,
     var notification = NewNotification(evaluated, "comment", "Nueva valoración recibida", string.IsNullOrWhiteSpace(rating.Comment) ? $"{authorName} valoró la sesión compartida." : $"{authorName}: {rating.Comment}", connection.Id);
     db.AddRange(rating, notification);
     await db.SaveChangesAsync();
-    await PushNotification(notification, hub);
+    await PushNotification(notification, hub, devicePush);
     var count = await db.Ratings.CountAsync(x => x.EvaluatedUserId == evaluated);
     var avg = await db.Ratings.Where(x => x.EvaluatedUserId == evaluated).AverageAsync(x => (double)(x.Usefulness + x.Respect + x.Fulfillment + x.Clarity) / 4);
     if (count >= 3 && avg >= 4 && !await db.Recognitions.AnyAsync(x => x.UserId == evaluated)) { db.Add(new Recognition { UserId = evaluated, CriterionOrigin = "3 sesiones valoradas positivamente" }); await db.SaveChangesAsync(); }
@@ -631,7 +671,11 @@ object ChatMessageView(ChatMessage message, string sender, bool isMine, ChatAtta
     isMine,
     attachment = attachment is null ? null : new { attachment.Id, attachment.FileName, attachment.ContentType, attachment.SizeBytes }
 };
-async Task PushNotification(Notification item, IHubContext<RealtimeHub> hub) => await hub.Clients.Group(RealtimeHub.UserGroup(item.UserId)).SendAsync("NotificationReceived", NotificationView(item));
+async Task PushNotification(Notification item, IHubContext<RealtimeHub> hub, DevicePushService devicePush, CancellationToken cancellationToken = default)
+{
+    await hub.Clients.Group(RealtimeHub.UserGroup(item.UserId)).SendAsync("NotificationReceived", NotificationView(item), cancellationToken);
+    await devicePush.SendAsync(item, cancellationToken);
+}
 IQueryable<ReputationRow> ReputationRows(ConectaMentesDbContext db) =>
     from rating in db.Ratings
     join session in db.Sessions on rating.SessionId equals session.Id
@@ -722,6 +766,9 @@ public sealed record ConnectionResponse(bool Accept);
 public sealed record ChatMessageInput(string Text);
 public sealed record SessionInput(DateTimeOffset Date, int DurationMinutes, string Mode, string Objective);
 public sealed record GoogleMeetRequest(string AccessToken);
+public sealed record PushSubscriptionInput(string Endpoint, PushSubscriptionKeys Keys);
+public sealed record PushSubscriptionKeys(string P256dh, string Auth);
+public sealed record PushUnsubscribeInput(string Endpoint);
 public sealed record AdminAccessStatusInput(string Status, string? Reason);
 public sealed record RatingInput(int Usefulness, int Respect, int Fulfillment, int Clarity, string? Comment);
 public sealed record ReportInput(Guid ReportedUserId, Guid ReferenceId, string Reason, string Description);
