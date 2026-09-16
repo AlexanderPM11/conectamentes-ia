@@ -1,4 +1,4 @@
-import { ChangeEvent, CSSProperties, FormEvent, StrictMode, useEffect, useRef, useState } from 'react';
+import { ChangeEvent, CSSProperties, FormEvent, Fragment, StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import './styles.css';
@@ -13,7 +13,7 @@ const PWA_VERSION = new URL(import.meta.url).pathname.split('/').pop() ?? 'app';
 const APPLIED_WORKER_KEY = 'conectamentes_applied_worker';
 type Mode = 'welcome' | 'login' | 'register' | 'recover';
 type Tab = 'inicio' | 'perfil' | 'solicitudes' | 'coincidencias' | 'mensajes' | 'ranking' | 'agenda' | 'seguridad' | 'panel' | 'admin';
-type IconName = 'home' | 'profile' | 'request' | 'match' | 'message' | 'bell' | 'search' | 'calendar' | 'shield' | 'chart' | 'star' | 'more';
+type IconName = 'home' | 'profile' | 'request' | 'match' | 'message' | 'bell' | 'search' | 'calendar' | 'shield' | 'chart' | 'star' | 'more' | 'back';
 
 const navItems: { id: Tab; label: string; icon: IconName }[] = [
   { id: 'inicio', label: 'Inicio', icon: 'home' },
@@ -191,10 +191,11 @@ function App() {
   const primaryNavItems = navItems.slice(0, 4);
   const secondaryTabActive = ['perfil', 'ranking', 'agenda', 'seguridad', 'panel', 'admin'].includes(tab);
   const bottomActiveIndex = showMore || secondaryTabActive ? 4 : Math.max(0, primaryNavItems.findIndex(item => item.id === tab));
+  const isChatMobileActive = tab === 'mensajes' && Boolean(chatConnectionId);
 
   if (!logged) return <><Welcome mode={mode} setMode={setMode} notice={notice} busy={busy} submit={authSubmit} googleLogin={googleLogin} /><UpdatePrompt {...pwaUpdate} /></>;
 
-  return <><div className="app-layout">
+  return <><div className={`app-layout ${isChatMobileActive ? 'in-chat-mobile' : ''}`}>
     <aside className="sidebar"><Brand /><nav className="side-nav" aria-label="Navegación principal">{availableNavItems.map(item => <NavButton key={item.id} item={item} active={tab === item.id} onClick={() => navigate(item.id)} />)}</nav><div className="sidebar-note"><IsoBadge kind="network" /><p>Conexiones cuidadas, aprendizaje compartido.</p></div></aside>
     <main className="app-main">
       <header className="mobile-header"><Brand /><div className="header-actions"><NotificationButton count={unreadCount} onClick={() => setShowNotifications(true)} /><button className="avatar-button" aria-label="Abrir perfil" onClick={() => navigate('perfil')}><ProfileAvatar userId={me?.id} name={me?.displayName} version={me?.avatarUpdatedAt} /></button></div></header>
@@ -205,7 +206,7 @@ function App() {
         {tab === 'perfil' && <Profile profile={profile} setProfile={setProfile} notify={setNotice} userId={me?.id} user={me} setMe={setMe} />}
         {tab === 'solicitudes' && <Requests requests={requests} form={requestForm} setForm={setRequestForm} submit={createRequest} calculate={calculate} />}
         {tab === 'coincidencias' && <ConnectionsExplorer matches={matches} requestId={selectedRequest} notify={setNotice} onRequestTopic={(topic: string) => { setRequestForm({ ...requestForm, topic, description: `Quiero encontrar una persona para aprender sobre ${topic}.`, helpType: 'comprender', desiredSchedule: '' }); navigate('solicitudes'); }} />}
-        {tab === 'mensajes' && <Messages connections={connections} selectedId={chatConnectionId} setSelectedId={setChatConnectionId} messagesByConnection={messagesByConnection} setMessagesByConnection={setMessagesByConnection} realtimeConnected={realtimeConnected} notify={setNotice} />}
+        {tab === 'mensajes' && <Messages connections={connections} selectedId={chatConnectionId} setSelectedId={setChatConnectionId} messagesByConnection={messagesByConnection} setMessagesByConnection={setMessagesByConnection} realtimeConnected={realtimeConnected} notify={setNotice} navigate={navigate} />}
         {tab === 'ranking' && <Ranking notify={setNotice} />}
         {tab === 'agenda' && <Agenda connections={connections} sessions={sessions} setConnections={setConnections} setSessions={setSessions} notify={setNotice} />}
         {tab === 'seguridad' && <Security connections={connections} notify={setNotice} />}
@@ -349,30 +350,68 @@ function RequestMatches({ matches, requestId, notify }: any) {
   return <section className="screen"><ScreenIntro kicker="COMPATIBILIDAD EXPLICABLE" title="Personas que pueden ayudarte" description="Cada recomendación incluye una razón clara. Tú decides con quién conectar." badge="network" />{!requestId || matches.length === 0 ? <EmptyState title="Todavía no hay conexiones sugeridas" text="Publica una solicitud y selecciona “Buscar compañeros” para ver recomendaciones." badge="network" /> : <div className="match-grid">{matches.map((item: any, index: number) => <article className="match-card" key={item.id}><div className="match-avatar">{initials(item.candidate)}<span>{index + 1}</span></div><div className="match-score"><strong>{Math.round(item.score)}%</strong><span>compatible</span></div><h3>{item.candidate}</h3><p>{item.explanation}</p><div className="reason-chips"><span>Tema afín</span><span>Horario compatible</span></div><div className="card-actions"><button className="button button-primary small" onClick={() => accept(item.id)}>Conectar</button><button className="button button-ghost small" onClick={() => reject(item.id)}>Ahora no</button></div></article>)}</div>}</section>;
 }
 
-function Messages({ connections, selectedId, setSelectedId, messagesByConnection, setMessagesByConnection, realtimeConnected, notify }: any) {
+function Messages({ connections, selectedId, setSelectedId, messagesByConnection, setMessagesByConnection, realtimeConnected, notify, navigate }: any) {
   const active = connections.filter((item: any) => item.status === 'Activa' || item.status === 1);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
   const messagesEnd = useRef<HTMLDivElement>(null);
-  const currentId = active.some((item: any) => item.id === selectedId) ? selectedId : active[0]?.id ?? '';
-  const current = active.find((item: any) => item.id === currentId);
-  const messages = messagesByConnection[currentId] ?? [];
-  useEffect(() => { if (!selectedId && active[0]) setSelectedId(active[0].id); }, [active.length, selectedId]);
-  useEffect(() => { if (!currentId || messagesByConnection[currentId]) return; api('/api/conexiones/' + currentId + '/mensajes').then(items => setMessagesByConnection((value: any) => ({ ...value, [currentId]: items }))).catch((error: unknown) => notify(error instanceof Error ? error.message : 'No pudimos abrir la conversación.')); }, [currentId]);
-  useEffect(() => { messagesEnd.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [messages.length, currentId]);
+  const isInitialOpen = useRef(true);
 
-  function clearFile() { if (previewUrl) URL.revokeObjectURL(previewUrl); setPreviewUrl(''); setSelectedFile(null); if (fileInput.current) fileInput.current.value = ''; }
+  // Auto-seleccionar primer chat en pantallas grandes si no hay ninguno seleccionado
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth >= 900 && !selectedId && active[0]) {
+      setSelectedId(active[0].id);
+    }
+  }, [active.length, selectedId, setSelectedId]);
+
+  const currentId = active.some((item: any) => item.id === selectedId)
+    ? selectedId
+    : (typeof window !== 'undefined' && window.innerWidth >= 900 ? (active[0]?.id ?? '') : '');
+  const current = active.find((item: any) => item.id === currentId);
+  const messages = currentId ? (messagesByConnection[currentId] ?? []) : [];
+
+  useEffect(() => {
+    isInitialOpen.current = true;
+  }, [currentId]);
+
+  useEffect(() => {
+    if (!currentId || messagesByConnection[currentId]) return;
+    api('/api/conexiones/' + currentId + '/mensajes')
+      .then(items => setMessagesByConnection((value: any) => ({ ...value, [currentId]: items })))
+      .catch((error: unknown) => notify(error instanceof Error ? error.message : 'No pudimos abrir la conversación.'));
+  }, [currentId]);
+
+  useEffect(() => {
+    if (messagesEnd.current) {
+      messagesEnd.current.scrollIntoView({ behavior: isInitialOpen.current ? 'auto' : 'smooth', block: 'end' });
+      isInitialOpen.current = false;
+    }
+  }, [messages.length, currentId]);
+
+  function clearFile() {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl('');
+    setSelectedFile(null);
+    if (fileInput.current) fileInput.current.value = '';
+  }
+
   function chooseFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-    if (file.size > MAX_CHAT_FILE_BYTES) { notify('El archivo supera el límite de 10 MB.'); event.target.value = ''; return; }
+    if (file.size > MAX_CHAT_FILE_BYTES) {
+      notify('El archivo supera el límite de 10 MB.');
+      event.target.value = '';
+      return;
+    }
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setSelectedFile(file);
     setPreviewUrl(file.type.startsWith('image/') ? URL.createObjectURL(file) : '');
   }
+
   async function send(event: FormEvent) {
     event.preventDefault();
     if ((!draft.trim() && !selectedFile) || !currentId) return;
@@ -380,16 +419,283 @@ function Messages({ connections, selectedId, setSelectedId, messagesByConnection
     try {
       let message;
       if (selectedFile) {
-        const data = new FormData(); data.append('file', selectedFile); data.append('caption', draft.trim());
+        const data = new FormData();
+        data.append('file', selectedFile);
+        data.append('caption', draft.trim());
         message = await api('/api/conexiones/' + currentId + '/adjuntos', { method: 'POST', body: data });
-      } else message = await api('/api/conexiones/' + currentId + '/mensajes', { method: 'POST', body: JSON.stringify({ text: draft }) });
+      } else {
+        message = await api('/api/conexiones/' + currentId + '/mensajes', { method: 'POST', body: JSON.stringify({ text: draft }) });
+      }
       setMessagesByConnection((value: any) => ({ ...value, [currentId]: mergeMessage(value[currentId] ?? [], message) }));
-      setDraft(''); clearFile();
-    } catch (error) { notify(error instanceof Error ? error.message : 'No pudimos enviar el mensaje.'); }
-    finally { setSending(false); }
+      setDraft('');
+      clearFile();
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'No pudimos enviar el mensaje.');
+    } finally {
+      setSending(false);
+    }
   }
 
-  return <section className="screen"><ScreenIntro kicker="BANDEJA SOCIAL" title="Tus mensajes" description="Toca una conexión para abrir la conversación y seguir aprendiendo juntos." badge="chat" />{active.length ? <div className="chat-layout"><aside className="conversation-list"><div className="conversation-heading"><div><p className="eyebrow">MENSAJES</p><span>{active.length} conexiones activas</span></div><i className={realtimeConnected ? 'live-indicator' : 'live-indicator offline'}>{realtimeConnected ? 'en vivo' : 'reconectando'}</i></div><div className="social-rail" aria-label="Contactos recientes">{active.map((item: any, index: number) => <button className={item.id === currentId ? 'social-story selected' : 'social-story'} key={item.id} onClick={() => { clearFile(); setSelectedId(item.id); }} aria-label={`Abrir conversación con ${item.counterpart}`}><span className={`story-ring story-tone-${index % 4}`}><span>{initials(item.counterpart)}</span><i /></span></button>)}</div></aside><section className="chat-card"><header><div className="chat-person"><span className="chat-avatar">{initials(current?.counterpart)}</span><div><strong>{current?.counterpart}</strong><small>{current?.topic}</small></div></div><span className="safe-chat"><Icon name="shield" /> espacio cuidado</span></header><div className="messages-scroll" aria-live="polite">{messages.length ? messages.map((item: any) => <article className={item.isMine ? 'message-bubble mine' : 'message-bubble'} key={item.id}>{item.attachment && (item.attachment.contentType?.startsWith('image/') ? <ProtectedChatImage attachment={item.attachment} notify={notify} /> : <button className="document-attachment" onClick={() => openChatAttachment(item.attachment).catch((error: Error) => notify(error.message))}><span className="document-icon">DOC</span><span><strong>{item.attachment.fileName}</strong><small>{formatFileSize(item.attachment.sizeBytes)} · Toca para abrir</small></span><b>↓</b></button>)}{item.text && <MessageText text={item.text} /> }<div className="message-meta"><span>{item.isMine ? 'Tú' : current?.counterpart}</span><time>{formatDominicanDateTimeCompact(item.createdAt)}</time></div></article>) : <div className="chat-empty"><IsoBadge kind="chat" large /><h2>Empiecen por un objetivo pequeño</h2><p>Saluda, comparte tu duda y acuerden cómo quieren avanzar.</p></div>}<div ref={messagesEnd} /></div><form className="message-composer" onSubmit={send}>{selectedFile && <div className="attachment-preview">{previewUrl ? <img src={previewUrl} alt="Vista previa del archivo" /> : <span className="document-icon">DOC</span>}<span><strong>{selectedFile.name}</strong><small>{formatFileSize(selectedFile.size)} · máximo 10 MB</small></span><button type="button" onClick={clearFile} aria-label="Quitar archivo">×</button></div>}<div className="composer-row"><input ref={fileInput} className="file-input" type="file" accept={CHAT_FILE_ACCEPT} onChange={chooseFile} aria-label="Seleccionar imagen o documento" /><button type="button" className="attach-button" onClick={() => fileInput.current?.click()} aria-label="Adjuntar imagen o documento">＋</button><input value={draft} onChange={event => setDraft(event.target.value)} maxLength={1500} placeholder={selectedFile ? 'Agrega un mensaje opcional…' : 'Escribe un mensaje…'} aria-label="Mensaje" /><button className="send-button" disabled={sending || (!draft.trim() && !selectedFile)} aria-label="Enviar mensaje">{sending ? '…' : '↗'}</button></div><small className="upload-limit">Imágenes y documentos · máximo 10 MB</small></form></section></div> : <EmptyState title="Tus conversaciones aparecerán aquí" text="Cuando ambos acepten una conexión, el chat se activará automáticamente." badge="chat" />}</section>;
+  const filteredActive = active.filter((item: any) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (item.counterpart && item.counterpart.toLowerCase().includes(q)) ||
+           (item.topic && item.topic.toLowerCase().includes(q));
+  });
+
+  if (!active.length) {
+    return (
+      <section className="screen">
+        <ScreenIntro kicker="BANDEJA SOCIAL" title="Tus mensajes" description="Toca una conexión para abrir la conversación y seguir aprendiendo juntos." badge="chat" />
+        <EmptyState title="Tus conversaciones aparecerán aquí" text="Cuando ambos acepten una conexión, el chat se activará automáticamente." badge="chat" />
+      </section>
+    );
+  }
+
+  const isMobileConversationOpen = Boolean(currentId);
+
+  return (
+    <section className={`screen chat-screen ${isMobileConversationOpen ? 'chat-active-mobile' : 'chat-inbox-mobile'}`}>
+      {!isMobileConversationOpen && (
+        <ScreenIntro kicker="BANDEJA SOCIAL" title="Tus mensajes" description="Toca una conversación para abrir el chat y seguir aprendiendo juntos." badge="chat" />
+      )}
+
+      <div className={`chat-layout ${isMobileConversationOpen ? 'showing-conversation' : 'showing-inbox'}`}>
+        {/* Bandeja de conversaciones / Inbox */}
+        <aside className="conversation-list">
+          <div className="conversation-heading">
+            <div>
+              <p className="eyebrow">CONVERSACIONES</p>
+              <span>{active.length} {active.length === 1 ? 'conexión activa' : 'conexiones activas'}</span>
+            </div>
+            <i className={realtimeConnected ? 'live-indicator' : 'live-indicator offline'}>
+              {realtimeConnected ? 'en vivo' : 'reconectando'}
+            </i>
+          </div>
+
+          <div className="conversation-search">
+            <Icon name="search" />
+            <input
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Buscar por compañero o tema…"
+              aria-label="Buscar conversaciones"
+            />
+            {searchQuery && (
+              <button type="button" className="clear-search" onClick={() => setSearchQuery('')} aria-label="Limpiar búsqueda">×</button>
+            )}
+          </div>
+
+          <div className="social-rail" aria-label="Contactos recientes">
+            {filteredActive.map((item: any, index: number) => (
+              <button
+                className={item.id === currentId ? 'social-story selected' : 'social-story'}
+                key={item.id}
+                onClick={() => { clearFile(); setSelectedId(item.id); }}
+                aria-label={`Abrir conversación con ${item.counterpart}`}
+              >
+                <span className={`story-ring story-tone-${index % 4}`}>
+                  <span>{initials(item.counterpart)}</span>
+                  <i />
+                </span>
+                <small>{(item.counterpart || 'CM').split(' ')[0]}</small>
+              </button>
+            ))}
+          </div>
+
+          <div className="contact-list" role="list">
+            {filteredActive.length ? (
+              filteredActive.map((item: any, index: number) => {
+                const itemMessages = messagesByConnection[item.id] ?? [];
+                const lastMsg = itemMessages[itemMessages.length - 1];
+                const snippet = lastMsg
+                  ? (lastMsg.text || (lastMsg.attachment ? `📎 ${lastMsg.attachment.fileName}` : 'Archivo adjunto'))
+                  : (item.topic || 'Conexión lista para conversar');
+                const timeLabel = lastMsg ? formatRelative(lastMsg.createdAt) : 'Nueva conexión';
+                const isSelected = item.id === currentId;
+
+                return (
+                  <button
+                    key={item.id}
+                    className={`conversation-item ${isSelected ? 'active' : ''}`}
+                    onClick={() => { clearFile(); setSelectedId(item.id); }}
+                  >
+                    <span className="contact-avatar">
+                      <span className={`contact-avatar-core story-tone-${index % 4}`}>
+                        {initials(item.counterpart)}
+                      </span>
+                      <i className={realtimeConnected ? 'status-dot online' : 'status-dot offline'} />
+                    </span>
+                    <span className="contact-copy">
+                      <span className="contact-copy-top">
+                        <strong>{item.counterpart}</strong>
+                        <time>{timeLabel}</time>
+                      </span>
+                      <small>{snippet}</small>
+                      <em>{item.topic}</em>
+                    </span>
+                    <b aria-hidden="true">›</b>
+                  </button>
+                );
+              })
+            ) : (
+              <p className="contacts-empty">No se encontraron conversaciones con esa búsqueda.</p>
+            )}
+          </div>
+        </aside>
+
+        {/* Panel de chat / Conversación activa */}
+        {current ? (
+          <section className="chat-card">
+            <header className="chat-card-header">
+              <div className="chat-card-header-left">
+                <button
+                  type="button"
+                  className="chat-back-button"
+                  onClick={() => { clearFile(); setSelectedId(''); }}
+                  aria-label="Volver a la lista de mensajes"
+                  title="Volver"
+                >
+                  <Icon name="back" />
+                </button>
+                <div className="chat-person">
+                  <span className="chat-avatar">{initials(current?.counterpart)}</span>
+                  <div className="chat-person-details">
+                    <strong>{current?.counterpart}</strong>
+                    <small>
+                      <span>{current?.topic}</span>
+                      <span className="presence-text">{realtimeConnected ? ' · en línea' : ''}</span>
+                    </small>
+                  </div>
+                </div>
+              </div>
+              <div className="chat-card-header-right">
+                <span className="safe-chat" title="Espacio seguro y monitoreado">
+                  <Icon name="shield" /> <span>espacio cuidado</span>
+                </span>
+                {navigate && (
+                  <button
+                    type="button"
+                    className="chat-quick-agenda-btn"
+                    onClick={() => navigate('agenda')}
+                    title="Coordinar o revisar sesiones de estudio"
+                  >
+                    <Icon name="calendar" />
+                    <span>Agendar</span>
+                  </button>
+                )}
+              </div>
+            </header>
+
+            <div className="messages-scroll" aria-live="polite">
+              {messages.length ? (
+                messages.map((item: any, index: number) => {
+                  const prev = messages[index - 1];
+                  const currentDateKey = dominicanDateKey(item.createdAt);
+                  const prevDateKey = prev ? dominicanDateKey(prev.createdAt) : null;
+                  const showDateDivider = currentDateKey !== prevDateKey;
+                  const isSameSenderAsPrev = prev && prev.isMine === item.isMine && !showDateDivider;
+
+                  return (
+                    <Fragment key={item.id}>
+                      {showDateDivider && (
+                        <div className="chat-date-divider" role="separator">
+                          <span>{formatChatDayDivider(item.createdAt)}</span>
+                        </div>
+                      )}
+                      <article className={`message-bubble ${item.isMine ? 'mine' : 'theirs'} ${isSameSenderAsPrev ? 'consecutive' : ''}`}>
+                        {item.attachment && (
+                          item.attachment.contentType?.startsWith('image/')
+                            ? <ProtectedChatImage attachment={item.attachment} notify={notify} />
+                            : <button className="document-attachment" onClick={() => openChatAttachment(item.attachment).catch((error: Error) => notify(error.message))}>
+                                <span className="document-icon">DOC</span>
+                                <span>
+                                  <strong>{item.attachment.fileName}</strong>
+                                  <small>{formatFileSize(item.attachment.sizeBytes)} · Toca para abrir</small>
+                                </span>
+                                <b>↓</b>
+                              </button>
+                        )}
+                        {item.text && <MessageText text={item.text} />}
+                        <div className="message-meta">
+                          <time>{formatDominicanTime(item.createdAt)}</time>
+                          {item.isMine && <span className="status-ticks" aria-hidden="true">✓✓</span>}
+                        </div>
+                      </article>
+                    </Fragment>
+                  );
+                })
+              ) : (
+                <div className="chat-empty">
+                  <IsoBadge kind="chat" large />
+                  <h2>Comienza la conversación con {current.counterpart}</h2>
+                  <p>Saluda, comparte tu duda sobre <strong>{current.topic}</strong> y acuerden el horario para apoyarse.</p>
+                </div>
+              )}
+              <div ref={messagesEnd} />
+            </div>
+
+            <form className="message-composer" onSubmit={send}>
+              {selectedFile && (
+                <div className="attachment-preview">
+                  {previewUrl ? <img src={previewUrl} alt="Vista previa del archivo" /> : <span className="document-icon">DOC</span>}
+                  <div className="attachment-info">
+                    <strong>{selectedFile.name}</strong>
+                    <small>{formatFileSize(selectedFile.size)} · máximo 10 MB</small>
+                  </div>
+                  <button type="button" className="attachment-remove-btn" onClick={clearFile} aria-label="Quitar archivo">×</button>
+                </div>
+              )}
+              <div className="composer-row">
+                <input
+                  ref={fileInput}
+                  className="file-input"
+                  type="file"
+                  accept={CHAT_FILE_ACCEPT}
+                  onChange={chooseFile}
+                  aria-label="Seleccionar imagen o documento"
+                />
+                <button
+                  type="button"
+                  className="attach-button"
+                  onClick={() => fileInput.current?.click()}
+                  aria-label="Adjuntar imagen o documento"
+                  title="Adjuntar archivo"
+                >
+                  ＋
+                </button>
+                <input
+                  value={draft}
+                  onChange={event => setDraft(event.target.value)}
+                  maxLength={1500}
+                  placeholder={selectedFile ? 'Agrega un comentario al archivo…' : 'Escribe un mensaje…'}
+                  aria-label="Mensaje"
+                />
+                <button
+                  type="submit"
+                  className="send-button"
+                  disabled={sending || (!draft.trim() && !selectedFile)}
+                  aria-label="Enviar mensaje"
+                  title="Enviar"
+                >
+                  {sending ? '…' : '↗'}
+                </button>
+              </div>
+              <small className="upload-limit">Imágenes y documentos · máximo 10 MB</small>
+            </form>
+          </section>
+        ) : (
+          <div className="chat-card chat-card-placeholder">
+            <EmptyState
+              title="Selecciona una conversación"
+              text="Elige un compañero de la lista para ver el historial y enviarse mensajes."
+              badge="chat"
+            />
+          </div>
+        )}
+      </div>
+    </section>
+  );
 }
 
 function ProtectedChatImage({ attachment, notify }: { attachment: any; notify: (message: string) => void }) {
@@ -608,8 +914,8 @@ function IsoBadge({ kind, large = false }: { kind: 'book' | 'chat' | 'network'; 
 function NavButton({ item, active, onClick }: { item: { id: Tab; label: string; icon: IconName }; active: boolean; onClick: () => void }) { return <button className={active ? 'nav-button active' : 'nav-button'} onClick={onClick}><Icon name={item.icon} /><span>{item.label}</span></button>; }
 
 function Icon({ name }: { name: IconName }) {
-  const paths: Record<IconName, string> = { home: 'M3 11.5 12 4l9 7.5M5.5 10v10h13V10M9 20v-6h6v6', profile: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm7 8a7 7 0 0 0-14 0', request: 'M6 4h12v16H6zM9 8h6M9 12h6M9 16h3', match: 'M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8 0a4 4 0 1 0 0-8M2 20a6 6 0 0 1 12 0m-2-3a6 6 0 0 1 10 3', message: 'M4 5h16v11H8l-4 4V5Zm4 5h8m-8 3h5', bell: 'M6 17h12l-2-3V9a4 4 0 0 0-8 0v5l-2 3Zm4 3h4', search: 'm21 21-4.35-4.35m1.35-5.65a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z', calendar: 'M4 7h16v13H4zM8 3v4m8-4v4M4 11h16m-5 3-3 3-2-2', shield: 'M12 3 5 6v5c0 5 3 8 7 10 4-2 7-5 7-10V6l-7-3Zm-3 9 2 2 4-4', chart: 'M4 20V10m6 10V4m6 16v-7m4 7H2', star: 'm12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z', more: 'M5 12h.01M12 12h.01M19 12h.01' };
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d={paths[name]} /></svg>;
+  const paths: Record<IconName, string> = { home: 'M3 11.5 12 4l9 7.5M5.5 10v10h13V10M9 20v-6h6v6', profile: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm7 8a7 7 0 0 0-14 0', request: 'M6 4h12v16H6zM9 8h6M9 12h6M9 16h3', match: 'M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8 0a4 4 0 1 0 0-8M2 20a6 6 0 0 1 12 0m-2-3a6 6 0 0 1 10 3', message: 'M4 5h16v11H8l-4 4V5Zm4 5h8m-8 3h5', bell: 'M6 17h12l-2-3V9a4 4 0 0 0-8 0v5l-2 3Zm4 3h4', search: 'm21 21-4.35-4.35m1.35-5.65a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z', calendar: 'M4 7h16v13H4zM8 3v4m8-4v4M4 11h16m-5 3-3 3-2-2', shield: 'M12 3 5 6v5c0 5 3 8 7 10 4-2 7-5 7-10V6l-7-3Zm-3 9 2 2 4-4', chart: 'M4 20V10m6 10V4m6 16v-7m4 7H2', star: 'm12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z', more: 'M5 12h.01M12 12h.01M19 12h.01', back: 'M19 12H5m7 7-7-7 7-7' };
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name]} /></svg>;
 }
 
 function initials(name?: string) { return (name || 'CM').split(' ').slice(0, 2).map(part => part[0]).join('').toUpperCase(); }
@@ -619,6 +925,7 @@ function formatDominicanTime(value: string | Date) { return new Intl.DateTimeFor
 function formatDominicanDate(value: string | Date) { return new Intl.DateTimeFormat(DO_LOCALE, { timeZone: DO_TIME_ZONE, day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value)); }
 function formatDominicanDateLong(value: string | Date) { return new Intl.DateTimeFormat(DO_LOCALE, { timeZone: DO_TIME_ZONE, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(value)); }
 function formatDominicanDateTimeCompact(value: string | Date) { return `${formatDominicanNumericDate(value)} · ${formatDominicanTime(value)}`; }
+function formatChatDayDivider(value: string | Date) { const date = new Date(value); const today = new Date(); const yesterday = new Date(today.getTime() - 86_400_000); const key = dominicanDateKey(date); if (key === dominicanDateKey(today)) return 'Hoy'; if (key === dominicanDateKey(yesterday)) return 'Ayer'; return formatDominicanDate(date); }
 function formatFileSize(value: number) { return value >= 1024 * 1024 ? `${(value / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(value / 1024))} KB`; }
 function formatDominicanNumericDate(value: string | Date) { return new Intl.DateTimeFormat(DO_LOCALE, { timeZone: DO_TIME_ZONE, day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(value)); }
 function dominicanSessionParts(value: string | Date) { const parts = new Intl.DateTimeFormat('en-US', { timeZone: DO_TIME_ZONE, day: '2-digit', month: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }).formatToParts(new Date(value)); const get = (type: string) => parts.find(part => part.type === type)?.value ?? ''; return { date: `${get('day')}/${get('month')}/${get('year')}`, hour: get('hour'), minute: get('minute'), period: get('dayPeriod') === 'PM' ? 'PM' : 'AM' }; }
