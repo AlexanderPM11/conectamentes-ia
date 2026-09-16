@@ -40,3 +40,8 @@ Prueba funcional: se crearon conexiones activas con Ana Torres, Lucas Rojas y So
 - 2026-09-15: Se simplificó el flujo de Nueva solicitud con lenguaje guiado, campos más claros, una ayuda contextual y un CTA orientado a encontrar apoyo.
 - 2026-09-15: Se ampliaron los tipos de apoyo en tres grupos: comprender y aprender, practicar y prepararme, y revisar mi avance; se conservaron los valores anteriores para compatibilidad.
 - 2026-09-15: Se rediseñó Mensajes como una agenda de contactos: búsqueda por persona o tema, estado de conexión, avatar isométrico, conversación activa y mejor jerarquía para móvil.
+- 2026-09-15: Se evolucionó la bandeja de Mensajes hacia una experiencia social moderna: carrusel de contactos recientes, anillos de estado, avatar personalizado, búsqueda y conversaciones con acentos cálidos.
+- 2026-09-15: Se simplificó Mensajes a un carrusel superior de conexiones; se retiraron el listado y el buscador, y cada círculo abre directamente su conversación.
+- 2026-09-15: Se redujo el carrusel de Mensajes a círculos limpios sin etiquetas; el contacto activo se identifica únicamente con un borde naranja.
+- 2026-09-15: Se mejoró el interior del chat con burbujas diferenciadas, remitente y hora, fondo sutil, compositor redondeado y microanimación de entrada, manteniendo el tiempo real.
+- 2026-09-15: Se fijó una altura máxima para el área de mensajes y se habilitó desplazamiento vertical independiente, especialmente ajustado al viewport móvil.
