@@ -37,10 +37,15 @@ async function api(path: string, options: RequestInit = {}) {
 }
 
 function urlBase64ToUint8Array(value: string) {
-  const padding = '='.repeat((4 - value.length % 4) % 4);
-  const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const clean = value.trim();
+  const padding = '='.repeat((4 - clean.length % 4) % 4);
+  const base64 = (clean + padding).replace(/-/g, '+').replace(/_/g, '/');
   const raw = window.atob(base64);
-  return Uint8Array.from([...raw].map(character => character.charCodeAt(0)));
+  const output = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; ++i) {
+    output[i] = raw.charCodeAt(i);
+  }
+  return output;
 }
 
 async function subscribeDevicePush() {
@@ -436,7 +441,16 @@ function NotificationsPanel({ items, onClose, onOpen, onMarkAll }: any) {
       }
     } catch (error) {
       setPushActive(false);
-      setPermissionMessage(error instanceof Error ? error.message : 'No pudimos activar los avisos en este momento. Inténtalo nuevamente.');
+      const raw = error instanceof Error ? error.message : '';
+      if (/push service error/i.test(raw)) {
+        setPermissionMessage('El navegador no pudo conectar con el servicio de avisos del sistema. Si usas Brave, activa «Servicios de Google para mensajería push» en brave://settings/privacy y reinicia el navegador; si usas bloqueadores de red o modo incógnito, pruébalo en una pestaña normal.');
+      } else if (/applicationServerKey/i.test(raw)) {
+        setPermissionMessage('La clave de avisos del servidor no es compatible o no está configurada.');
+      } else if (raw && !/failed|error|object|DOMException/i.test(raw)) {
+        setPermissionMessage(raw);
+      } else {
+        setPermissionMessage('No pudimos activar los avisos en este momento. Inténtalo nuevamente.');
+      }
     } finally {
       setRequestingPermission(false);
     }
