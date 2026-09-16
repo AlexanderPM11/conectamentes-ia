@@ -1,6 +1,7 @@
 namespace ConectaMentes.Tests;
 
 using ConectaMentes.Application.Auth;
+using ConectaMentes.Application.Reputation;
 using ConectaMentes.Domain.Entities;
 
 public class FoundationTests
@@ -34,6 +35,18 @@ public class FoundationTests
         Assert.Equal("token", registered.AccessToken);
         Assert.NotNull(loggedIn);
         Assert.Equal("ana@example.com", loggedIn!.User.Email);
+    }
+
+    [Fact]
+    public void Reputation_ranking_rewards_consistency_without_hiding_quality()
+    {
+        var onePerfectRating = ReputationCalculator.RankingScore(5, 1);
+        var tenStrongRatings = ReputationCalculator.RankingScore(4.8, 10);
+
+        Assert.Equal(4.25, onePerfectRating);
+        Assert.Equal(4.62, tenStrongRatings);
+        Assert.True(tenStrongRatings > onePerfectRating);
+        Assert.Equal(4.5, ReputationCalculator.SessionScore(5, 4, 5, 4));
     }
 
     private sealed class FakeTokenService : ITokenService

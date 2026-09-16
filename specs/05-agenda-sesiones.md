@@ -15,6 +15,8 @@ enfocada.
 - Como par conectado, quiero recibir una guía breve (objetivo, pasos,
   comprobación final) para la sesión.
 - Como estudiante, quiero recordatorios de mis sesiones agendadas.
+- Como participante de una sesión virtual, quiero crear un Google Meet y
+  compartirlo automáticamente con mi compañero.
 
 ## Criterios de aceptación
 
@@ -35,15 +37,21 @@ enfocada.
 - **Given** el formulario de agenda en móvil (selector de fecha/hora),
   **when** el usuario interactúa con él, **then** no se produce zoom
   automático y el selector es utilizable con el pulgar.
+- **Given** una Sesión virtual futura, **when** un participante autoriza
+  Google Calendar y solicita una reunión, **then** se crea un evento único
+  con ambos participantes y el enlace de Meet se comparte en el chat.
 
 ## Reglas de negocio
 
 - Una Sesión no puede crearse sin una Conexión con ambas aceptaciones.
 - Estados de Sesión: `agendada` → `completada` | `cancelada`.
 - La guía de sesión es una sugerencia editable, no un guion obligatorio.
-- La coordinación queda dentro de la app (fecha, modalidad, enlace externo
-  si aplica); la videollamada integrada está fuera de alcance (ver
-  `SPEC.md` §2.2).
+- La coordinación queda dentro de la app. Google Meet requiere autorización
+  incremental del participante y se genera como servicio externo; la
+  videollamada embebida continúa fuera de alcance (ver `SPEC.md` §2.2).
+- Los mensajes permiten una imagen o documento por envío, con un máximo de
+  10 MB, formatos permitidos explícitos y acceso restringido a los dos
+  participantes de la conexión.
 
 ## Entidades y datos
 
@@ -51,7 +59,9 @@ enfocada.
   estudianteColaboradorId, estado (`pendiente_colaborador`, `activa`,
   `rechazada`).
 - **Sesion**: id, conexionId, fecha, duración, modalidad, objetivo, guía,
-  estado.
+  meetUrl, googleCalendarEventId, estado.
+- **AdjuntoChat**: id, mensajeId, conexionId, autorId, nombre, tipo MIME,
+  tamaño, ubicación privada, fecha.
 
 ## Endpoints sugeridos
 
@@ -61,6 +71,9 @@ enfocada.
 - `PUT /api/sesiones/{id}`
 - `POST /api/sesiones/{id}/cancelar`
 - `POST /api/sesiones/{id}/completar`
+- `POST /api/sesiones/{id}/google-meet`
+- `POST /api/conexiones/{id}/adjuntos`
+- `GET /api/adjuntos/{id}`
 
 ## Pantallas mobile-first
 
@@ -68,6 +81,7 @@ enfocada.
 2. Formulario de propuesta/confirmación de fecha, modalidad y duración.
 3. Vista de "Mis sesiones" (próximas/pasadas) con la guía visible.
 4. Confirmación de cancelación con el diálogo personalizado.
+5. Adjuntos dentro del chat y acción de Google Meet en sesiones virtuales.
 
 ## Diagrama a generar
 

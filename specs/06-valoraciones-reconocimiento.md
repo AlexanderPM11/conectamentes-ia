@@ -11,6 +11,10 @@ convertir el apoyo en competencia.
 - Como participante de una sesión, quiero indicar si el objetivo se logró y
   qué necesita seguimiento.
 - Como colaborador, quiero recibir reconocimiento por mi aporte académico.
+- Como colaborador, quiero consultar mi reputación general y las valoraciones
+  recibidas en cada tema que he impartido.
+- Como estudiante que busca apoyo, quiero consultar un ranking orientativo
+  por tema antes de elegir con quién conectar.
 - Como estudiante, quiero que mi valoración se enfoque en la experiencia
   académica, no en juzgar a la persona.
 
@@ -31,6 +35,15 @@ convertir el apoyo en competencia.
 - **Given** una valoración registrada, **when** el motor de coincidencias
   vuelve a ejecutarse (spec 04), **then** esa valoración influye en el
   puntaje de compatibilidad futuro del colaborador evaluado.
+- **Given** una sesión completada, **when** quien solicitó el apoyo intenta
+  valorarla, **then** puede hacerlo una sola vez y la valoración se asigna
+  al colaborador que impartió la orientación.
+- **Given** varias valoraciones recibidas, **when** se consulta la reputación
+  de un colaborador, **then** se muestra el promedio general, las cuatro
+  dimensiones, el desglose por tema y los comentarios académicos recientes.
+- **Given** el ranking de colaboradores, **when** se ordenan los resultados,
+  **then** se ajusta el promedio por el número de valoraciones para evitar
+  que una única puntuación alta produzca una posición engañosa.
 - **Given** el formulario de valoración en móvil, **when** el usuario
   califica con estrellas/escalas, **then** los controles son táctiles
   (sin depender de precisión de mouse) y no accionan zoom.
@@ -42,8 +55,11 @@ convertir el apoyo en competencia.
   constancia (informe, sección 10).
 - Las valoraciones deben referirse a la experiencia académica, no a
   características personales del compañero.
-- El reconocimiento es informativo, no competitivo: no se debe implementar
-  como ranking público comparativo entre estudiantes.
+- El ranking es orientativo y académico: sirve para elegir apoyo, no muestra
+  notas negativas, no aplica sanciones y nunca reemplaza la compatibilidad
+  de tema, horario o modalidad.
+- Solo el estudiante solicitante que recibió la orientación puede calificar
+  al colaborador, una vez por sesión completada.
 
 ## Entidades y datos
 
@@ -56,6 +72,7 @@ convertir el apoyo en competencia.
 - `POST /api/sesiones/{id}/valoraciones`
 - `GET /api/usuarios/{id}/reconocimientos`
 - `GET /api/usuarios/{id}/reputacion` (resumen agregado, no solo promedio)
+- `GET /api/ranking?tema={texto}` (clasificación ajustada por tema)
 
 ## Pantallas mobile-first
 
@@ -64,6 +81,7 @@ convertir el apoyo en competencia.
 2. Vista de perfil con reconocimientos/insignias obtenidas.
 3. Mensaje de agradecimiento/confirmación tras enviar la valoración
    (componente propio, no `alert()`).
+4. Ranking filtrable por tema y bloque de reputación dentro del perfil.
 
 ## Diagrama a generar
 

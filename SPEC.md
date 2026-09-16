@@ -27,9 +27,9 @@ docente, no resuelve tareas y no toma decisiones sancionatorias.
 ### 2.2 Explícitamente fuera de alcance (no construir en esta versión)
 
 - Integración automática con el sistema universitario.
-- Videollamadas dentro de la plataforma (la coordinación es de modalidad y
-  horario; la sesión en sí ocurre fuera de la app o vía un enlace externo
-  que el usuario pega manualmente).
+- Videollamadas embebidas dentro de la plataforma. La sesión ocurre fuera
+  de la app; para encuentros virtuales se puede crear un evento externo de
+  Google Calendar con enlace único de Google Meet y compartirlo en el chat.
 - Reconocimiento académico oficial o créditos.
 - Conexiones entre varias universidades.
 - Aplicación móvil nativa (el requisito mobile-first se cumple con la PWA).

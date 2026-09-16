@@ -18,6 +18,7 @@ public sealed class ConectaMentesDbContext(DbContextOptions<ConectaMentesDbConte
     public DbSet<Report> Reports => Set<Report>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
+    public DbSet<ChatAttachment> ChatAttachments => Set<ChatAttachment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -31,6 +32,9 @@ public sealed class ConectaMentesDbContext(DbContextOptions<ConectaMentesDbConte
             entity.Property(user => user.Career).HasMaxLength(160).IsRequired();
             entity.Property(user => user.AcademicTerm).HasMaxLength(80).IsRequired();
             entity.Property(user => user.Roles).HasMaxLength(200).IsRequired();
+            entity.Property(user => user.AccessStatus).HasMaxLength(20).IsRequired();
+            entity.Property(user => user.AccessStatusReason).HasMaxLength(500);
+            entity.HasIndex(user => user.AccessStatus);
         });
         modelBuilder.Entity<Notification>(entity =>
         {
@@ -45,6 +49,26 @@ public sealed class ConectaMentesDbContext(DbContextOptions<ConectaMentesDbConte
             entity.HasKey(item => item.Id);
             entity.HasIndex(item => new { item.ConnectionId, item.CreatedAt });
             entity.Property(item => item.Text).HasMaxLength(1500).IsRequired();
+        });
+        modelBuilder.Entity<ChatAttachment>(entity =>
+        {
+            entity.HasKey(item => item.Id);
+            entity.HasIndex(item => item.MessageId).IsUnique();
+            entity.HasIndex(item => new { item.ConnectionId, item.CreatedAt });
+            entity.Property(item => item.FileName).HasMaxLength(180).IsRequired();
+            entity.Property(item => item.StoredName).HasMaxLength(260).IsRequired();
+            entity.Property(item => item.ContentType).HasMaxLength(120).IsRequired();
+        });
+        modelBuilder.Entity<LearningSession>(entity =>
+        {
+            entity.Property(item => item.MeetUrl).HasMaxLength(500);
+            entity.Property(item => item.GoogleCalendarEventId).HasMaxLength(200);
+        });
+        modelBuilder.Entity<Rating>(entity =>
+        {
+            entity.HasIndex(item => new { item.SessionId, item.AuthorId }).IsUnique();
+            entity.HasIndex(item => new { item.EvaluatedUserId, item.CreatedAt });
+            entity.Property(item => item.Comment).HasMaxLength(500);
         });
     }
 }

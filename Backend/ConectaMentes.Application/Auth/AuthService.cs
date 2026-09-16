@@ -21,6 +21,7 @@ public sealed class AuthService(IUserRepository users, ITokenService tokens) : I
     {
         var user = await users.FindByEmailAsync(NormalizeEmail(command.Email), cancellationToken);
         if (user is null || !PasswordService.Verify(command.Password, user.PasswordHash)) return null;
+        EnsureAccess(user);
         return new AuthResult(tokens.CreateToken(user), UserProfile.From(user));
     }
 
@@ -34,6 +35,7 @@ public sealed class AuthService(IUserRepository users, ITokenService tokens) : I
             await users.AddAsync(user, cancellationToken);
             await users.SaveChangesAsync(cancellationToken);
         }
+        EnsureAccess(user);
         return new AuthResult(tokens.CreateToken(user), UserProfile.From(user));
     }
 
@@ -41,6 +43,11 @@ public sealed class AuthService(IUserRepository users, ITokenService tokens) : I
         => (await users.FindByIdAsync(userId, cancellationToken)) is { } user ? UserProfile.From(user) : null;
 
     public static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
+
+    private static void EnsureAccess(User user)
+    {
+        if (!user.IsAccessAllowed) throw new AccountAccessException(user.AccessStatus, user.AccessStatusReason);
+    }
 
     private static void ValidateRegistration(RegisterCommand command)
     {

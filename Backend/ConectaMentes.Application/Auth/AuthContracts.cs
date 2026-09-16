@@ -5,6 +5,11 @@ namespace ConectaMentes.Application.Auth;
 public sealed record RegisterCommand(string Email, string Password, string DisplayName, string Career, string AcademicTerm);
 public sealed record LoginCommand(string Email, string Password);
 public sealed record ExternalLoginCommand(string Email, string DisplayName);
+public sealed class AccountAccessException(string status, string? reason) : Exception(BuildMessage(status, reason))
+{
+    public string Status { get; } = status;
+    private static string BuildMessage(string status, string? reason) => $"Tu cuenta está {status switch { "blocked" => "bloqueada", "suspended" => "suspendida", _ => "restringida" }}.{(string.IsNullOrWhiteSpace(reason) ? string.Empty : $" Motivo: {reason}")}";
+}
 public sealed record AuthResult(string AccessToken, UserProfile User);
 public sealed record UserProfile(Guid Id, string Email, string DisplayName, string Career, string AcademicTerm, DateTimeOffset CreatedAt, IReadOnlyCollection<string> Roles)
 {
