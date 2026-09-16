@@ -34,6 +34,7 @@ services:
       Jwt__Issuer: ${Jwt__Issuer:-ConectaMentes.Api}
       Jwt__Audience: ${Jwt__Audience:-ConectaMentes.Frontend}
       Cors__Origins__0: http://localhost:${FRONTEND_PORT:-3000}
+      Google__ClientId: ${Google__ClientId}
       DisableHttpsRedirection: ${DisableHttpsRedirection:-true}
     depends_on:
       mysql:
@@ -46,6 +47,7 @@ services:
       context: ./Frontend
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID}
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-3000}:80"

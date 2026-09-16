@@ -74,3 +74,11 @@ se inyecta durante el build del frontend.
 Por defecto, MySQL se publica en el puerto local 3307 para evitar conflictos
 con instalaciones locales que ya usen 3306; dentro de Docker sigue disponible
 en mysql:3306.
+
+## Inicio con Google
+
+Para activar el acceso y registro con Google, crea un OAuth Client ID de tipo
+Web en Google Cloud y coloca el mismo valor en `VITE_GOOGLE_CLIENT_ID` y
+`Google__ClientId` dentro de `.env`. Agrega `http://localhost:3000` como origen
+JavaScript autorizado (y el dominio productivo cuando corresponda). Después
+reconstruye el frontend con `docker compose up -d --build`.

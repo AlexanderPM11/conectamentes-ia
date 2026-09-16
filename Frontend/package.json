@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@microsoft/signalr": "^8.0.29",
     "@vitejs/plugin-react": "^6.1.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

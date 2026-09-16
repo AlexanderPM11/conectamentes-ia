@@ -24,6 +24,19 @@ public sealed class AuthService(IUserRepository users, ITokenService tokens) : I
         return new AuthResult(tokens.CreateToken(user), UserProfile.From(user));
     }
 
+    public async Task<AuthResult> LoginWithGoogleAsync(ExternalLoginCommand command, CancellationToken cancellationToken)
+    {
+        var email = NormalizeEmail(command.Email);
+        var user = await users.FindByEmailAsync(email, cancellationToken);
+        if (user is null)
+        {
+            user = new User(email, PasswordService.Hash(Guid.NewGuid().ToString("N")), command.DisplayName.Trim(), "Por completar", "Por completar");
+            await users.AddAsync(user, cancellationToken);
+            await users.SaveChangesAsync(cancellationToken);
+        }
+        return new AuthResult(tokens.CreateToken(user), UserProfile.From(user));
+    }
+
     public async Task<UserProfile?> GetProfileAsync(Guid userId, CancellationToken cancellationToken)
         => (await users.FindByIdAsync(userId, cancellationToken)) is { } user ? UserProfile.From(user) : null;
 

@@ -4,6 +4,7 @@ namespace ConectaMentes.Application.Auth;
 
 public sealed record RegisterCommand(string Email, string Password, string DisplayName, string Career, string AcademicTerm);
 public sealed record LoginCommand(string Email, string Password);
+public sealed record ExternalLoginCommand(string Email, string DisplayName);
 public sealed record AuthResult(string AccessToken, UserProfile User);
 public sealed record UserProfile(Guid Id, string Email, string DisplayName, string Career, string AcademicTerm, DateTimeOffset CreatedAt, IReadOnlyCollection<string> Roles)
 {
@@ -27,5 +28,6 @@ public interface IAuthService
 {
     Task<AuthResult> RegisterAsync(RegisterCommand command, CancellationToken cancellationToken);
     Task<AuthResult?> LoginAsync(LoginCommand command, CancellationToken cancellationToken);
+    Task<AuthResult> LoginWithGoogleAsync(ExternalLoginCommand command, CancellationToken cancellationToken);
     Task<UserProfile?> GetProfileAsync(Guid userId, CancellationToken cancellationToken);
 }
