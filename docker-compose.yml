@@ -60,10 +60,10 @@ services:
         VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID}
     restart: unless-stopped
 
-    ports:
-      - "${FRONTEND_PORT:-3000}:80"
-    expose:
-      - "80"
+    # ports:
+    #   - "${FRONTEND_PORT:-3000}:80"
+    # expose:
+    #   - "80"
 
     depends_on:
       - api
