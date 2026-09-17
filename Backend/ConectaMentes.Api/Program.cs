@@ -288,38 +288,72 @@ requests.MapPost("/asistente-ia", async (AiSupportRequestPrompt input, IConfigur
     string? suggestedTopic = null;
     string? suggestedDescription = null;
 
-    var minimaxKey = config["MINIMAX_API_KEY"] ?? Environment.GetEnvironmentVariable("MINIMAX_API_KEY");
-    var openaiKey = config["OPENAI_API_KEY"] ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-    var groqKey = config["GROQ_API_KEY"] ?? Environment.GetEnvironmentVariable("GROQ_API_KEY");
+    var authKey = config["AI_API_KEY"]
+        ?? Environment.GetEnvironmentVariable("AI_API_KEY")
+        ?? config["OPENAI_API_KEY"]
+        ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY")
+        ?? config["MINIMAX_API_KEY"]
+        ?? Environment.GetEnvironmentVariable("MINIMAX_API_KEY")
+        ?? config["GROQ_API_KEY"]
+        ?? Environment.GetEnvironmentVariable("GROQ_API_KEY");
 
-    if (!string.IsNullOrWhiteSpace(minimaxKey) || !string.IsNullOrWhiteSpace(openaiKey) || !string.IsNullOrWhiteSpace(groqKey))
+    var model = config["AI_MODEL"]
+        ?? Environment.GetEnvironmentVariable("AI_MODEL");
+
+    var endpoint = config["AI_ENDPOINT"]
+        ?? Environment.GetEnvironmentVariable("AI_ENDPOINT");
+
+    if (!string.IsNullOrWhiteSpace(authKey))
     {
         try
         {
             var httpClient = httpClientFactory.CreateClient();
             httpClient.Timeout = TimeSpan.FromSeconds(15);
-            string endpoint;
-            string model;
-            string authKey;
 
-            if (!string.IsNullOrWhiteSpace(minimaxKey))
+            var isMinimaxKey = !string.IsNullOrWhiteSpace(config["MINIMAX_API_KEY"] ?? Environment.GetEnvironmentVariable("MINIMAX_API_KEY"));
+            var isGroqKey = !string.IsNullOrWhiteSpace(config["GROQ_API_KEY"] ?? Environment.GetEnvironmentVariable("GROQ_API_KEY"));
+
+            if (string.IsNullOrWhiteSpace(endpoint))
             {
-                endpoint = "https://api.minimax.chat/v1/text/chatcompletion_v2";
-                model = "MiniMax-Text-01";
-                authKey = minimaxKey;
+                if (isMinimaxKey || (model?.Contains("minimax", StringComparison.OrdinalIgnoreCase) == true))
+                {
+                    endpoint = "https://api.minimax.chat/v1/text/chatcompletion_v2";
+                }
+                else if (isGroqKey || (model?.Contains("llama", StringComparison.OrdinalIgnoreCase) == true))
+                {
+                    endpoint = "https://api.groq.com/openai/v1/chat/completions";
+                }
+                else
+                {
+                    endpoint = "https://api.openai.com/v1/chat/completions";
+                }
             }
-            else if (!string.IsNullOrWhiteSpace(groqKey))
+
+            if (string.IsNullOrWhiteSpace(model))
             {
-                endpoint = "https://api.groq.com/openai/v1/chat/completions";
-                model = "llama-3.3-70b-versatile";
-                authKey = groqKey;
+                if (endpoint.Contains("minimax", StringComparison.OrdinalIgnoreCase))
+                {
+                    model = "MiniMax-Text-01";
+                }
+                else if (endpoint.Contains("groq", StringComparison.OrdinalIgnoreCase))
+                {
+                    model = "llama-3.3-70b-versatile";
+                }
+                else
+                {
+                    model = "gpt-4o-mini";
+                }
             }
-            else
-            {
-                endpoint = "https://api.openai.com/v1/chat/completions";
-                model = "gpt-4o-mini";
-                authKey = openaiKey!;
-            }
+
+            var customSystemPrompt = config["AI_SYSTEM_PROMPT"] ?? Environment.GetEnvironmentVariable("AI_SYSTEM_PROMPT");
+            var systemContent = !string.IsNullOrWhiteSpace(customSystemPrompt)
+                ? customSystemPrompt
+                : "Eres un asistente pedagógico para la plataforma universitaria ConectaMentes.\n" +
+                  "Tu tarea es ayudar a un estudiante a estructurar su solicitud de apoyo académico a partir de lo que expresa con sus palabras.\n\n" +
+                  "Instrucciones:\n" +
+                  "1. Genera un tema o materia claro y conciso para el campo 'topic'.\n" +
+                  "2. Redacta una descripción clara y motivadora para el campo 'description', enfocada en aprender, comprender conceptos y practicar colaborativamente.\n" +
+                  "3. Responde exclusivamente con un objeto JSON válido con los campos 'topic' y 'description'.";
 
             var requestBody = new
             {
@@ -329,7 +363,7 @@ requests.MapPost("/asistente-ia", async (AiSupportRequestPrompt input, IConfigur
                     new
                     {
                         role = "system",
-                        content = "Eres el asistente pedagógico de ConectaMentes IA. Tu función es ayudar a un estudiante universitario a estructurar una solicitud de estudio entre pares a partir de lo que expresa con sus palabras.\nGenera ÚNICAMENTE un JSON válido con dos campos de texto:\n1. \"topic\": Título o materia académico preciso y conciso (máximo 50 caracteres, ej: \"Cálculo: Regla de la cadena\", \"Python: Funciones recursivas\").\n2. \"description\": Explicación orientada al aprendizaje colaborativo y comprensión (máximo 220 caracteres, ej: \"Quiero comprender los pasos de la regla de la cadena y practicar ejercicios paso a paso para prepararme bien.\").\nRegla crucial: La solicitud debe promover el aprendizaje y la colaboración, NUNCA pedir que alguien haga tareas o exámenes por el estudiante.\nDevuelve ÚNICAMENTE el objeto JSON sin formato markdown."
+                        content = systemContent
                     },
                     new
                     {
@@ -369,6 +403,13 @@ requests.MapPost("/asistente-ia", async (AiSupportRequestPrompt input, IConfigur
                         var start = cleaned.IndexOf('\n');
                         var end = cleaned.LastIndexOf("```");
                         if (start >= 0 && end > start) cleaned = cleaned.Substring(start + 1, end - start - 1).Trim();
+                    }
+
+                    var openBrace = cleaned.IndexOf('{');
+                    var closeBrace = cleaned.LastIndexOf('}');
+                    if (openBrace >= 0 && closeBrace > openBrace)
+                    {
+                        cleaned = cleaned.Substring(openBrace, closeBrace - openBrace + 1);
                     }
 
                     using var parsedDoc = System.Text.Json.JsonDocument.Parse(cleaned);
