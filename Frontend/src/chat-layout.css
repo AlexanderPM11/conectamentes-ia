@@ -34,7 +34,7 @@ body.mobile-chat-open {
   /* When inside an active conversation, take full screen like WhatsApp/Telegram */
   .app-layout.in-chat-mobile {
     position: fixed !important;
-    top: 0 !important;
+    top: var(--chat-vt, 0px) !important;
     left: 0 !important;
     right: 0 !important;
     bottom: auto !important;

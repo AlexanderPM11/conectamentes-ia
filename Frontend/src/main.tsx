@@ -795,20 +795,31 @@ function Messages({ connections, selectedId, setSelectedId, messagesByConnection
                   value={draft}
                   onChange={event => setDraft(event.target.value)}
                   onFocus={() => {
-                    setTimeout(() => {
-                      if (window.visualViewport) {
-                        document.documentElement.style.setProperty('--chat-vh', `${window.visualViewport.height}px`);
-                        document.documentElement.style.setProperty('--chat-vt', `${window.visualViewport.offsetTop}px`);
+                    const runSync = () => {
+                      const vv = window.visualViewport;
+                      if (vv) {
+                        document.documentElement.style.setProperty('--chat-vh', `${Math.round(vv.height)}px`);
+                        document.documentElement.style.setProperty('--chat-vt', `${Math.round(vv.offsetTop)}px`);
                       }
                       scrollToBottom('smooth');
-                    }, 80);
-                    setTimeout(() => {
-                      if (window.visualViewport) {
-                        document.documentElement.style.setProperty('--chat-vh', `${window.visualViewport.height}px`);
-                        document.documentElement.style.setProperty('--chat-vt', `${window.visualViewport.offsetTop}px`);
+                    };
+                    requestAnimationFrame(runSync);
+                    setTimeout(runSync, 80);
+                    setTimeout(runSync, 240);
+                    setTimeout(runSync, 420);
+                  }}
+                  onBlur={() => {
+                    const runBlurSync = () => {
+                      const vv = window.visualViewport;
+                      if (vv) {
+                        document.documentElement.style.setProperty('--chat-vh', `${Math.round(vv.height)}px`);
+                        document.documentElement.style.setProperty('--chat-vt', `${Math.round(vv.offsetTop)}px`);
                       }
-                      scrollToBottom('smooth');
-                    }, 260);
+                      if (window.scrollY !== 0) window.scrollTo(0, 0);
+                    };
+                    requestAnimationFrame(runBlurSync);
+                    setTimeout(runBlurSync, 120);
+                    setTimeout(runBlurSync, 320);
                   }}
                   onKeyDown={event => {
                     if (event.key === 'Enter' && !event.shiftKey) {
