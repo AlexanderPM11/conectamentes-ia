@@ -131,6 +131,7 @@ function App() {
   const [realtimeConnected, setRealtimeConnected] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [requestForm, setRequestForm] = useState({ topic: '', description: '', helpType: 'comprender', desiredSchedule: '' });
+  const [showAiDialog, setShowAiDialog] = useState(false);
   const [logged, setLogged] = useState(() => Boolean(localStorage.getItem('conectamente_token')));
   const canViewPanel = me?.roles?.some((role: string) => role === 'coordinator' || role === 'moderator');
   const canViewAdmin = me?.roles?.some((role: string) => role === 'superadmin');
@@ -279,6 +280,32 @@ function App() {
       <nav className="bottom-nav" aria-label="Navegación móvil" style={{ '--active-index': bottomActiveIndex } as CSSProperties}><span className="bottom-nav-indicator" aria-hidden="true" />{primaryNavItems.map(item => <NavButton key={item.id} item={item} active={tab === item.id} onClick={() => navigate(item.id)} />)}<button className={showMore || secondaryTabActive ? 'nav-button active' : 'nav-button'} onClick={() => setShowMore(true)}><Icon name="more" /><span>Más</span></button></nav>
       {showMore && <div className="sheet-backdrop" onClick={() => setShowMore(false)}><section className="more-sheet" onClick={event => event.stopPropagation()}><div className="sheet-handle" /><div className="sheet-title"><div><p className="eyebrow">MÁS OPCIONES</p><h2>Tu espacio completo</h2></div><button className="close-button" onClick={() => setShowMore(false)}>×</button></div>{availableNavItems.slice(4).map(item => <NavButton key={item.id} item={item} active={tab === item.id} onClick={() => navigate(item.id)} />)}<button className="sheet-logout" onClick={signOut}>Cerrar sesión</button></section></div>}
       {showNotifications && <NotificationsPanel items={notifications} onClose={() => setShowNotifications(false)} onOpen={openNotification} onMarkAll={markAllRead} />}
+      <button
+        type="button"
+        className="ai-fab-button"
+        onClick={() => setShowAiDialog(true)}
+        aria-label="Redactar con Asistente IA"
+        title="Redactar con Asistente IA"
+      >
+        <svg className="ai-fab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z" />
+          <path d="M5 3v4" />
+          <path d="M3 5h4" />
+          <path d="M19 17v4" />
+          <path d="M17 19h4" />
+        </svg>
+        <span className="ai-fab-pulse" aria-hidden="true" />
+      </button>
+      <AiRequestDialog
+        open={showAiDialog}
+        onClose={() => setShowAiDialog(false)}
+        onApply={(topic: string, description: string) => {
+          setRequestForm({ ...requestForm, topic, description });
+          navigate('solicitudes');
+          setNotice('Sugerencia de IA aplicada a tu solicitud.');
+        }}
+        notify={setNotice}
+      />
     </main>
   </div><UpdatePrompt {...pwaUpdate} /></>;
 }
@@ -396,15 +423,13 @@ function ReputationSummary({ reputation, title, compact = false }: { reputation:
 
 function StarDisplay({ value }: { value: number }) { const rounded = Math.round(Number(value)); return <span className="star-display" aria-label={`${Number(value).toFixed(1)} de 5 estrellas`}>{Array.from({ length: 5 }, (_, index) => <i className={index < rounded ? 'filled' : ''} key={index}>★</i>)}</span>; }
 
-function Requests({ requests, form, setForm, submit, calculate, notify }: any) {
-  const [showAi, setShowAi] = useState(false);
-
+function Requests({ requests, form, setForm, submit, calculate }: any) {
   return (
     <section className="screen">
       <ScreenIntro
         kicker="PEDIR APOYO"
         title="Cuéntanos qué necesitas"
-        description="Publica tu duda de forma sencilla o usa el asistente IA para redactarla en segundos."
+        description="Publica tu duda de forma sencilla o usa el botón flotante con IA para redactarla en segundos."
         badge="chat"
       />
       <div className="content-grid requests-grid">
@@ -483,30 +508,6 @@ function Requests({ requests, form, setForm, submit, calculate, notify }: any) {
           </div>
         </section>
       </div>
-
-      <button
-        type="button"
-        className="ai-fab-button"
-        onClick={() => setShowAi(true)}
-        aria-label="Redactar con Asistente IA"
-        title="Redactar con Asistente IA"
-      >
-        <svg className="ai-fab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z" />
-          <path d="M5 3v4" />
-          <path d="M3 5h4" />
-          <path d="M19 17v4" />
-          <path d="M17 19h4" />
-        </svg>
-        <span className="ai-fab-pulse" aria-hidden="true" />
-      </button>
-
-      <AiRequestDialog
-        open={showAi}
-        onClose={() => setShowAi(false)}
-        onApply={(topic: string, description: string) => setForm({ ...form, topic, description })}
-        notify={notify}
-      />
     </section>
   );
 }
