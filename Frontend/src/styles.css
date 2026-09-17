@@ -214,3 +214,80 @@
 .ai-actions-row {
   margin-top: 8px;
 }
+
+/* Soporte y temas de perfil */
+.skill-badge-note {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--sage);
+  border: 1px solid var(--sage-2);
+  margin-bottom: 6px;
+}
+
+.skill-role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--forest);
+  font-weight: 800;
+  font-size: 0.82rem;
+}
+
+.skill-role-badge svg {
+  width: 16px;
+  height: 16px;
+  stroke: var(--forest);
+}
+
+.skill-badge-note small {
+  color: var(--forest-2);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.confidence-level-block {
+  background: rgba(255, 253, 248, 0.9);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.confidence-level-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.confidence-level-header label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--forest);
+  margin: 0;
+}
+
+.confidence-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 99px;
+  background: var(--clay-soft);
+  color: var(--clay);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.confidence-scale-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-weight: 500;
+}
