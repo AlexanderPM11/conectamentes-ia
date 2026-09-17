@@ -220,16 +220,12 @@ function App() {
       const vv = window.visualViewport;
       if (vv) {
         const height = vv.height;
-        const top = vv.offsetTop;
         document.documentElement.style.setProperty('--chat-vh', `${height}px`);
-        document.documentElement.style.setProperty('--chat-vt', `${top}px`);
-        setIsKeyboardOpen(window.innerHeight - height > 120);
-      }
-      if (window.scrollY !== 0) {
-        window.scrollTo(0, 0);
-      }
-      if (document.body.scrollTop !== 0) {
-        document.body.scrollTop = 0;
+        document.documentElement.style.setProperty('--chat-vt', `${vv.offsetTop}px`);
+        setIsKeyboardOpen((window.innerHeight - height) > 100);
+      } else {
+        document.documentElement.style.setProperty('--chat-vh', `${window.innerHeight}px`);
+        document.documentElement.style.setProperty('--chat-vt', '0px');
       }
     };
 
@@ -240,7 +236,7 @@ function App() {
       vv.addEventListener('resize', syncViewport);
       vv.addEventListener('scroll', syncViewport);
     }
-    window.addEventListener('scroll', syncViewport);
+    window.addEventListener('resize', syncViewport);
 
     document.documentElement.classList.add('mobile-chat-open');
     document.body.classList.add('mobile-chat-open');
@@ -250,7 +246,7 @@ function App() {
         vv.removeEventListener('resize', syncViewport);
         vv.removeEventListener('scroll', syncViewport);
       }
-      window.removeEventListener('scroll', syncViewport);
+      window.removeEventListener('resize', syncViewport);
       document.documentElement.style.removeProperty('--chat-vh');
       document.documentElement.style.removeProperty('--chat-vt');
       document.documentElement.classList.remove('mobile-chat-open');
@@ -799,10 +795,20 @@ function Messages({ connections, selectedId, setSelectedId, messagesByConnection
                   value={draft}
                   onChange={event => setDraft(event.target.value)}
                   onFocus={() => {
-                    window.scrollTo(0, 0);
-                    document.body.scrollTop = 0;
-                    setTimeout(() => scrollToBottom('smooth'), 80);
-                    setTimeout(() => scrollToBottom('smooth'), 220);
+                    setTimeout(() => {
+                      if (window.visualViewport) {
+                        document.documentElement.style.setProperty('--chat-vh', `${window.visualViewport.height}px`);
+                        document.documentElement.style.setProperty('--chat-vt', `${window.visualViewport.offsetTop}px`);
+                      }
+                      scrollToBottom('smooth');
+                    }, 80);
+                    setTimeout(() => {
+                      if (window.visualViewport) {
+                        document.documentElement.style.setProperty('--chat-vh', `${window.visualViewport.height}px`);
+                        document.documentElement.style.setProperty('--chat-vt', `${window.visualViewport.offsetTop}px`);
+                      }
+                      scrollToBottom('smooth');
+                    }, 260);
                   }}
                   onKeyDown={event => {
                     if (event.key === 'Enter' && !event.shiftKey) {

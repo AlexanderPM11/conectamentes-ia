@@ -34,13 +34,14 @@ body.mobile-chat-open {
   /* When inside an active conversation, take full screen like WhatsApp/Telegram */
   .app-layout.in-chat-mobile {
     position: fixed !important;
-    top: var(--chat-vt, 0px) !important;
+    top: 0 !important;
     left: 0 !important;
     right: 0 !important;
     bottom: auto !important;
-    width: 100vw !important;
+    width: 100% !important;
     height: var(--chat-vh, 100dvh) !important;
     max-height: var(--chat-vh, 100dvh) !important;
+    min-height: 0 !important;
     overflow: hidden !important;
     background: var(--cream);
   }
@@ -53,6 +54,7 @@ body.mobile-chat-open {
   .app-layout.in-chat-mobile .app-main {
     height: 100% !important;
     max-height: 100% !important;
+    min-height: 0 !important;
     overflow: hidden !important;
   }
 
@@ -61,6 +63,7 @@ body.mobile-chat-open {
     max-width: 100% !important;
     height: 100% !important;
     max-height: 100% !important;
+    min-height: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
     overflow: hidden !important;
@@ -69,6 +72,7 @@ body.mobile-chat-open {
   .app-layout.in-chat-mobile .chat-screen {
     height: 100% !important;
     max-height: 100% !important;
+    min-height: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
     overflow: hidden !important;
@@ -77,6 +81,7 @@ body.mobile-chat-open {
   .app-layout.in-chat-mobile .chat-layout {
     height: 100% !important;
     max-height: 100% !important;
+    min-height: 0 !important;
     gap: 0 !important;
     margin: 0 !important;
   }
@@ -92,10 +97,12 @@ body.mobile-chat-open {
   }
 
   /* Full screen chat card on mobile */
-  .chat-layout.showing-conversation .chat-card {
+  .chat-layout.showing-conversation .chat-card,
+  .app-layout.in-chat-mobile .chat-card {
     display: grid !important;
     height: 100% !important;
     max-height: 100% !important;
+    min-height: 0 !important;
     border: 0 !important;
     border-radius: 0 !important;
     box-shadow: none !important;
@@ -104,14 +111,25 @@ body.mobile-chat-open {
     overflow: hidden !important;
   }
 
+  .app-layout.in-chat-mobile .messages-scroll {
+    min-height: 0 !important;
+    flex: 1 1 auto;
+  }
+
   /* Chat header safe area for notches/status bar */
   .chat-card-header {
     padding-top: max(14px, env(safe-area-inset-top));
+    flex-shrink: 0;
   }
 
   /* Composer safe area for gesture bar / virtual keyboard */
   .message-composer {
     padding: 10px 12px max(12px, env(safe-area-inset-bottom));
+    flex-shrink: 0;
+  }
+
+  .app-layout.keyboard-open .message-composer {
+    padding: 8px 12px 8px !important;
   }
 
   .app-layout.in-chat-mobile .composer-row {
@@ -119,19 +137,20 @@ body.mobile-chat-open {
   }
 
   .app-layout.in-chat-mobile .composer-row textarea {
-    min-height: 46px;
-    height: 46px;
-    max-height: 128px;
+    min-height: 44px;
+    height: 44px;
+    max-height: 120px;
     resize: none;
     overflow-y: hidden;
-    padding: 12px 16px;
-    border-radius: 18px;
+    padding: 11px 16px;
+    border-radius: 20px;
     line-height: 1.35;
+    font-size: 16px !important;
   }
 
   .app-layout.in-chat-mobile .attach-button,
   .app-layout.in-chat-mobile .send-button {
-    margin-bottom: 1px;
+    margin-bottom: 0;
   }
 }
 
@@ -1124,7 +1143,7 @@ body.mobile-chat-open {
   border-radius: 22px;
   background: #ffffff;
   color: var(--ink);
-  font-size: 0.94rem;
+  font-size: 16px;
   box-shadow: 0 2px 6px rgba(23, 59, 53, 0.03);
   transition: border-color 0.18s, box-shadow 0.18s;
 }
@@ -1148,7 +1167,7 @@ body.mobile-chat-open {
   border-radius: 22px;
   background: #ffffff;
   color: var(--ink);
-  font-size: 0.94rem;
+  font-size: 16px;
   line-height: 1.35;
   box-shadow: 0 2px 6px rgba(23, 59, 53, 0.03);
   transition: border-color 0.18s, box-shadow 0.18s, height 0.12s ease;
