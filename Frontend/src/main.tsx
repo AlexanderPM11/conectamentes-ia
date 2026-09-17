@@ -1,4 +1,4 @@
-import { ChangeEvent, CSSProperties, FormEvent, Fragment, StrictMode, useEffect, useRef, useState } from 'react';
+import { ChangeEvent, CSSProperties, FormEvent, Fragment, StrictMode, useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import './styles.css';
@@ -210,11 +210,58 @@ function App() {
   const secondaryTabActive = ['perfil', 'ranking', 'agenda', 'seguridad', 'panel', 'admin'].includes(tab);
   const bottomActiveIndex = showMore || secondaryTabActive ? 4 : Math.max(0, primaryNavItems.findIndex(item => item.id === tab));
   const isChatMobileActive = tab === 'mensajes' && Boolean(chatConnectionId) && typeof window !== 'undefined' && window.innerWidth < 900;
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isChatMobileActive || typeof window === 'undefined') return;
+
+    const syncViewport = () => {
+      const vv = window.visualViewport;
+      if (vv) {
+        const height = vv.height;
+        const top = vv.offsetTop;
+        document.documentElement.style.setProperty('--chat-vh', `${height}px`);
+        document.documentElement.style.setProperty('--chat-vt', `${top}px`);
+        setIsKeyboardOpen(window.innerHeight - height > 120);
+      }
+      if (window.scrollY !== 0) {
+        window.scrollTo(0, 0);
+      }
+      if (document.body.scrollTop !== 0) {
+        document.body.scrollTop = 0;
+      }
+    };
+
+    syncViewport();
+
+    const vv = window.visualViewport;
+    if (vv) {
+      vv.addEventListener('resize', syncViewport);
+      vv.addEventListener('scroll', syncViewport);
+    }
+    window.addEventListener('scroll', syncViewport);
+
+    document.documentElement.classList.add('mobile-chat-open');
+    document.body.classList.add('mobile-chat-open');
+
+    return () => {
+      if (vv) {
+        vv.removeEventListener('resize', syncViewport);
+        vv.removeEventListener('scroll', syncViewport);
+      }
+      window.removeEventListener('scroll', syncViewport);
+      document.documentElement.style.removeProperty('--chat-vh');
+      document.documentElement.style.removeProperty('--chat-vt');
+      document.documentElement.classList.remove('mobile-chat-open');
+      document.body.classList.remove('mobile-chat-open');
+    };
+  }, [isChatMobileActive]);
+
   const messagesView = <Messages connections={connections} selectedId={chatConnectionId} setSelectedId={setChatConnectionId} messagesByConnection={messagesByConnection} setMessagesByConnection={setMessagesByConnection} realtimeConnected={realtimeConnected} notify={setNotice} navigate={navigate} onlineUsers={onlineUsers} />;
 
   // A conversation is a dedicated mobile surface, not a layer over the app shell.
   // This keeps the keyboard, safe areas and scroll container in one layout context.
-  if (isChatMobileActive) return <><main className="mobile-chat-screen">{messagesView}</main><UpdatePrompt {...pwaUpdate} /></>;
+  if (isChatMobileActive) return <><main className={`mobile-chat-screen ${isKeyboardOpen ? 'keyboard-open' : ''}`}>{messagesView}</main><UpdatePrompt {...pwaUpdate} /></>;
 
   if (!logged) return <><Welcome mode={mode} setMode={setMode} notice={notice} busy={busy} submit={authSubmit} googleLogin={googleLogin} /><UpdatePrompt {...pwaUpdate} /></>;
 
@@ -382,8 +429,18 @@ function Messages({ connections, selectedId, setSelectedId, messagesByConnection
   const [searchQuery, setSearchQuery] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
   const draftInput = useRef<HTMLTextAreaElement>(null);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
   const messagesEnd = useRef<HTMLDivElement>(null);
-  const isInitialOpen = useRef(true);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
+    const el = messagesScrollRef.current;
+    if (el) {
+      el.scrollTo({
+        top: el.scrollHeight + 10000,
+        behavior
+      });
+    }
+  }, []);
 
   // Auto-seleccionar primer chat en pantallas grandes si no hay ninguno seleccionado
   useEffect(() => {
@@ -400,22 +457,56 @@ function Messages({ connections, selectedId, setSelectedId, messagesByConnection
   const isCurrentOnline = Boolean(current?.counterpartId && onlineUsers?.has(current.counterpartId));
 
   useEffect(() => {
-    isInitialOpen.current = true;
-  }, [currentId]);
-
-  useEffect(() => {
     if (!currentId || messagesByConnection[currentId]) return;
     api('/api/conexiones/' + currentId + '/mensajes')
       .then(items => setMessagesByConnection((value: any) => ({ ...value, [currentId]: items })))
       .catch((error: unknown) => notify(error instanceof Error ? error.message : 'No pudimos abrir la conversación.'));
   }, [currentId]);
 
+  // Desplazamiento confiable al último mensaje al entrar al chat
   useEffect(() => {
-    if (messagesEnd.current) {
-      messagesEnd.current.scrollIntoView({ behavior: isInitialOpen.current ? 'auto' : 'smooth', block: 'end' });
-      isInitialOpen.current = false;
-    }
-  }, [messages.length, currentId]);
+    if (!currentId) return;
+
+    scrollToBottom('auto');
+
+    const frame = requestAnimationFrame(() => {
+      scrollToBottom('auto');
+      const frame2 = requestAnimationFrame(() => {
+        scrollToBottom('auto');
+      });
+      return () => cancelAnimationFrame(frame2);
+    });
+
+    const t1 = setTimeout(() => scrollToBottom('auto'), 50);
+    const t2 = setTimeout(() => scrollToBottom('auto'), 150);
+    const t3 = setTimeout(() => scrollToBottom('auto'), 320);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, [currentId, scrollToBottom]);
+
+  // Desplazamiento al recibir o actualizar mensajes
+  useEffect(() => {
+    if (!currentId || !messages.length) return;
+    scrollToBottom('auto');
+    const timer = setTimeout(() => scrollToBottom('auto'), 50);
+    return () => clearTimeout(timer);
+  }, [messages.length, currentId, scrollToBottom]);
+
+  // Mantener scroll abajo cuando el teclado virtual cambie el tamaño del viewport
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return;
+    const handleViewportResize = () => {
+      scrollToBottom('auto');
+    };
+    const vv = window.visualViewport;
+    vv.addEventListener('resize', handleViewportResize);
+    return () => vv.removeEventListener('resize', handleViewportResize);
+  }, [scrollToBottom]);
 
   // Keep the composer readable while typing, especially above the mobile keyboard.
   useEffect(() => {
@@ -463,6 +554,7 @@ function Messages({ connections, selectedId, setSelectedId, messagesByConnection
       setMessagesByConnection((value: any) => ({ ...value, [currentId]: mergeMessage(value[currentId] ?? [], message) }));
       setDraft('');
       clearFile();
+      setTimeout(() => scrollToBottom('smooth'), 40);
     } catch (error) {
       notify(error instanceof Error ? error.message : 'No pudimos enviar el mensaje.');
     } finally {
@@ -628,7 +720,7 @@ function Messages({ connections, selectedId, setSelectedId, messagesByConnection
               </div>
             </header>
 
-            <div className="messages-scroll" aria-live="polite">
+            <div className="messages-scroll" ref={messagesScrollRef} aria-live="polite">
               {messages.length ? (
                 messages.map((item: any, index: number) => {
                   const prev = messages[index - 1];
@@ -647,7 +739,7 @@ function Messages({ connections, selectedId, setSelectedId, messagesByConnection
                       <article className={`message-bubble ${item.isMine ? 'mine' : 'theirs'} ${isSameSenderAsPrev ? 'consecutive' : ''}`}>
                         {item.attachment && (
                           item.attachment.contentType?.startsWith('image/')
-                            ? <ProtectedChatImage attachment={item.attachment} notify={notify} />
+                            ? <ProtectedChatImage attachment={item.attachment} notify={notify} onImageLoaded={() => scrollToBottom('auto')} />
                             : <button className="document-attachment" onClick={() => openChatAttachment(item.attachment).catch((error: Error) => notify(error.message))}>
                                 <span className="document-icon">DOC</span>
                                 <span>
@@ -709,6 +801,18 @@ function Messages({ connections, selectedId, setSelectedId, messagesByConnection
                   ref={draftInput}
                   value={draft}
                   onChange={event => setDraft(event.target.value)}
+                  onFocus={() => {
+                    window.scrollTo(0, 0);
+                    document.body.scrollTop = 0;
+                    setTimeout(() => scrollToBottom('smooth'), 80);
+                    setTimeout(() => scrollToBottom('smooth'), 220);
+                  }}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                      event.preventDefault();
+                      send(event);
+                    }
+                  }}
                   maxLength={1500}
                   rows={1}
                   placeholder={selectedFile ? 'Agrega un comentario al archivo…' : 'Escribe un mensaje…'}
@@ -741,10 +845,10 @@ function Messages({ connections, selectedId, setSelectedId, messagesByConnection
   );
 }
 
-function ProtectedChatImage({ attachment, notify }: { attachment: any; notify: (message: string) => void }) {
+function ProtectedChatImage({ attachment, notify, onImageLoaded }: { attachment: any; notify: (message: string) => void; onImageLoaded?: () => void }) {
   const [src, setSrc] = useState('');
   useEffect(() => { let active = true; let objectUrl = ''; const token = localStorage.getItem('conectamente_token'); fetch(`${API}/api/adjuntos/${attachment.id}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} }).then(response => { if (!response.ok) throw new Error(); return response.blob(); }).then(blob => { objectUrl = URL.createObjectURL(blob); if (active) setSrc(objectUrl); }).catch(() => active && notify('No pudimos cargar una imagen del chat.')); return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl); }; }, [attachment.id]);
-  return <button className="image-attachment" onClick={() => openChatAttachment(attachment).catch((error: Error) => notify(error.message))} aria-label={`Abrir ${attachment.fileName}`}>{src ? <img src={src} alt={attachment.fileName} loading="lazy" /> : <span>Cargando imagen…</span>}</button>;
+  return <button className="image-attachment" onClick={() => openChatAttachment(attachment).catch((error: Error) => notify(error.message))} aria-label={`Abrir ${attachment.fileName}`}>{src ? <img src={src} alt={attachment.fileName} loading="lazy" onLoad={() => onImageLoaded?.()} /> : <span>Cargando imagen…</span>}</button>;
 }
 
 function MessageText({ text }: { text: string }) {

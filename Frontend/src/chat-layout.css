@@ -11,37 +11,57 @@
   gap: 14px;
 }
 
-/* Dedicated mobile conversation surface. It replaces the app shell so the
-   keyboard cannot resize or visually swallow the inbox layout. */
+/* Body lock when mobile chat is active to completely prevent iOS window scroll */
+html.mobile-chat-open,
+body.mobile-chat-open {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+}
+
+/* Dedicated mobile conversation surface. Matches the visual viewport height above keyboard. */
 @media (max-width: 899px) {
   .mobile-chat-screen {
-    position: fixed;
-    z-index: 100;
-    inset: 0;
-    width: 100vw;
-    height: 100dvh;
-    min-height: 100svh;
-    max-height: 100dvh;
-    overflow: hidden;
-    background: #f7f4ee;
-  }
-
-  .mobile-chat-screen .chat-screen,
-  .mobile-chat-screen .chat-layout,
-  .mobile-chat-screen .chat-card {
-    height: 100dvh;
-    max-height: 100dvh;
+    position: fixed !important;
+    z-index: 100 !important;
+    top: var(--chat-vt, 0px) !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: auto !important;
+    width: 100vw !important;
+    height: var(--chat-vh, 100dvh) !important;
+    max-height: var(--chat-vh, 100dvh) !important;
+    overflow: hidden !important;
+    background: #f7f4ee !important;
+    display: flex !important;
+    flex-direction: column !important;
   }
 
   .mobile-chat-screen .chat-screen {
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
   }
 
   .mobile-chat-screen .chat-layout {
-    gap: 0;
-    margin: 0;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    gap: 0 !important;
+    margin: 0 !important;
+    overflow: hidden !important;
   }
 
   .mobile-chat-screen .conversation-list {
@@ -50,11 +70,43 @@
 
   .mobile-chat-screen .chat-card {
     display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
+    flex: 1 1 auto !important;
+    height: 100% !important;
+    max-height: 100% !important;
     border: 0 !important;
     border-radius: 0 !important;
     box-shadow: none !important;
-    grid-template-rows: auto minmax(0, 1fr) auto !important;
-    overflow: hidden;
+    overflow: hidden !important;
+    background: #f7f4ee !important;
+  }
+
+  .mobile-chat-screen .chat-card-header {
+    flex-shrink: 0 !important;
+    position: relative !important;
+    top: 0 !important;
+    z-index: 20 !important;
+  }
+
+  .mobile-chat-screen .messages-scroll {
+    flex: 1 1 auto !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior-y: contain !important;
+  }
+
+  .mobile-chat-screen .message-composer {
+    flex-shrink: 0 !important;
+    position: relative !important;
+    bottom: 0 !important;
+    z-index: 20 !important;
+  }
+
+  .mobile-chat-screen.keyboard-open .message-composer {
+    padding: 8px 12px 8px !important;
   }
 }
 
@@ -64,13 +116,15 @@
 @media (max-width: 899px) {
   /* When inside an active conversation, take full screen like WhatsApp/Telegram */
   .app-layout.in-chat-mobile {
-    position: fixed;
-    inset: 0;
-    width: 100vw;
-    height: 100dvh;
-    min-height: 100svh;
-    max-height: 100dvh;
-    overflow: hidden;
+    position: fixed !important;
+    top: var(--chat-vt, 0px) !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: auto !important;
+    width: 100vw !important;
+    height: var(--chat-vh, 100dvh) !important;
+    max-height: var(--chat-vh, 100dvh) !important;
+    overflow: hidden !important;
     background: var(--cream);
   }
 
@@ -80,35 +134,34 @@
   }
 
   .app-layout.in-chat-mobile .app-main {
-    height: 100dvh;
-    min-height: 100svh;
-    max-height: 100dvh;
-    overflow: hidden;
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
   }
 
   .app-layout.in-chat-mobile .screen-content {
     width: 100% !important;
     max-width: 100% !important;
-    height: 100dvh !important;
-    max-height: 100dvh !important;
+    height: 100% !important;
+    max-height: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
-    overflow: hidden;
+    overflow: hidden !important;
   }
 
   .app-layout.in-chat-mobile .chat-screen {
-    height: 100dvh;
-    max-height: 100dvh;
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
+    height: 100% !important;
+    max-height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
   }
 
   .app-layout.in-chat-mobile .chat-layout {
-    height: 100dvh;
-    max-height: 100dvh;
-    gap: 0;
-    margin: 0;
+    height: 100% !important;
+    max-height: 100% !important;
+    gap: 0 !important;
+    margin: 0 !important;
   }
 
   /* When showing an active conversation on mobile, hide the conversation list */
@@ -124,14 +177,14 @@
   /* Full screen chat card on mobile */
   .chat-layout.showing-conversation .chat-card {
     display: grid !important;
-    height: 100dvh !important;
-    max-height: 100dvh !important;
+    height: 100% !important;
+    max-height: 100% !important;
     border: 0 !important;
     border-radius: 0 !important;
     box-shadow: none !important;
-    grid-template-rows: auto 1fr auto !important;
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
     background: #f7f4ee !important;
-    overflow: hidden;
+    overflow: hidden !important;
   }
 
   /* Chat header safe area for notches/status bar */
