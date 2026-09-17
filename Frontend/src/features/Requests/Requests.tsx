@@ -213,12 +213,12 @@ export function AiRequestDialog({ open, onClose, onApply, notify }: { open: bool
                 required
               />
             </label>
-            <div className="custom-dialog-actions ai-actions-row">
-              <button type="button" className="button button-ghost" onClick={() => setSuggestion(null)}>
-                Volver a escribir
+            <div className="ai-actions-row" style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
+              <button type="button" className="button button-secondary icon-button" onClick={() => setSuggestion(null)} aria-label="Reintentar" title="Volver a escribir">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
               </button>
-              <button type="button" className="button button-primary" onClick={handleAccept}>
-                ✓ Usar en mi solicitud
+              <button type="button" className="button button-primary icon-button" onClick={handleAccept} aria-label="Aceptar" title="Usar en mi solicitud">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
               </button>
             </div>
           </div>
