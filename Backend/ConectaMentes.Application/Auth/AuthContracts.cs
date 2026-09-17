@@ -2,7 +2,7 @@ using ConectaMentes.Domain.Entities;
 
 namespace ConectaMentes.Application.Auth;
 
-public sealed record RegisterCommand(string Email, string Password, string DisplayName, string Career, string AcademicTerm);
+public sealed record RegisterCommand(string Email, string Password, string DisplayName);
 public sealed record LoginCommand(string Email, string Password);
 public sealed record ExternalLoginCommand(string Email, string DisplayName);
 public sealed class AccountAccessException(string status, string? reason) : Exception(BuildMessage(status, reason))

@@ -148,7 +148,7 @@ app.MapGet("/api/v1", () => Results.Ok(new { name = "ConectaMentes IA API", vers
 var auth = app.MapGroup("/api/auth").WithTags("Autenticación");
 auth.MapPost("/registro", async (RegisterRequest request, IAuthService service, CancellationToken ct) =>
 {
-    try { return Results.Created("/api/usuarios/me", await service.RegisterAsync(new(request.Email, request.Password, request.DisplayName, request.Career, request.AcademicTerm), ct)); }
+    try { return Results.Created("/api/usuarios/me", await service.RegisterAsync(new(request.Email, request.Password, request.DisplayName), ct)); }
     catch (ArgumentException ex) { return Results.ValidationProblem(new Dictionary<string, string[]> { ["request"] = [ex.Message] }); }
     catch (InvalidOperationException ex) { return Results.Problem(statusCode: 409, title: "No se pudo completar el registro", detail: ex.Message); }
 }).WithName("Register").WithOpenApi();
@@ -1015,7 +1015,7 @@ app.Run();
 
 public partial class Program;
 
-public sealed record RegisterRequest(string Email, string Password, string DisplayName, string Career, string AcademicTerm);
+public sealed record RegisterRequest(string Email, string Password, string DisplayName);
 public sealed record ProfileUpdateRequest(string DisplayName, string Career, string AcademicTerm);
 public sealed record LoginRequest(string Email, string Password);
 public sealed record GoogleLoginRequest(string Credential);

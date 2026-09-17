@@ -11,7 +11,7 @@ public sealed class AuthService(IUserRepository users, ITokenService tokens) : I
         if (await users.FindByEmailAsync(email, cancellationToken) is not null)
             throw new InvalidOperationException("No se pudo completar el registro con esos datos.");
 
-        var user = new User(email, PasswordService.Hash(command.Password), command.DisplayName.Trim(), command.Career.Trim(), command.AcademicTerm.Trim());
+        var user = new User(email, PasswordService.Hash(command.Password), command.DisplayName.Trim(), "Por completar", "Por completar");
         await users.AddAsync(user, cancellationToken);
         await users.SaveChangesAsync(cancellationToken);
         return new AuthResult(tokens.CreateToken(user), UserProfile.From(user));
@@ -53,6 +53,6 @@ public sealed class AuthService(IUserRepository users, ITokenService tokens) : I
     {
         if (string.IsNullOrWhiteSpace(command.Email) || !command.Email.Contains('@')) throw new ArgumentException("El email no es válido.");
         if (string.IsNullOrWhiteSpace(command.Password) || command.Password.Length < 8) throw new ArgumentException("La contraseña debe tener al menos 8 caracteres.");
-        if (string.IsNullOrWhiteSpace(command.DisplayName) || string.IsNullOrWhiteSpace(command.Career) || string.IsNullOrWhiteSpace(command.AcademicTerm)) throw new ArgumentException("Completa los datos académicos obligatorios.");
+        if (string.IsNullOrWhiteSpace(command.DisplayName)) throw new ArgumentException("El nombre es obligatorio.");
     }
 }
