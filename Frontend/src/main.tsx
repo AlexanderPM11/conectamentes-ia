@@ -129,6 +129,7 @@ function App() {
   const [messagesByConnection, setMessagesByConnection] = useState<Record<string, any[]>>({});
   const [chatConnectionId, setChatConnectionId] = useState('');
   const [realtimeConnected, setRealtimeConnected] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [requestForm, setRequestForm] = useState({ topic: '', description: '', helpType: 'comprender', desiredSchedule: '' });
   const [logged, setLogged] = useState(() => Boolean(localStorage.getItem('conectamente_token')));
   const canViewPanel = me?.roles?.some((role: string) => role === 'coordinator' || role === 'moderator');
@@ -145,10 +146,27 @@ function App() {
       setNotifications(current => current.some(entry => entry.id === item.id) ? current : [item, ...current]);
     });
     realtime.on('ChatMessageReceived', item => setMessagesByConnection(current => ({ ...current, [item.connectionId]: mergeMessage(current[item.connectionId] ?? [], { ...item, isMine: item.senderId === me?.id }) })));
+    realtime.on('UserPresenceChanged', (userId: string, isOnline: boolean) => {
+      setOnlineUsers(current => {
+        const next = new Set(current);
+        if (isOnline) next.add(userId);
+        else next.delete(userId);
+        return next;
+      });
+    });
     realtime.onreconnecting(() => setRealtimeConnected(false));
-    realtime.onreconnected(() => setRealtimeConnected(true));
-    realtime.onclose(() => setRealtimeConnected(false));
-    realtime.start().then(() => setRealtimeConnected(true)).catch(() => setRealtimeConnected(false));
+    realtime.onreconnected(() => {
+      setRealtimeConnected(true);
+      api('/api/usuarios/conectados').then((ids: string[]) => setOnlineUsers(new Set(ids))).catch(() => undefined);
+    });
+    realtime.onclose(() => {
+      setRealtimeConnected(false);
+      setOnlineUsers(new Set());
+    });
+    realtime.start().then(() => {
+      setRealtimeConnected(true);
+      api('/api/usuarios/conectados').then((ids: string[]) => setOnlineUsers(new Set(ids))).catch(() => undefined);
+    }).catch(() => setRealtimeConnected(false));
     return () => { realtime.stop(); };
   }, [logged, me?.id]);
   useEffect(() => {
@@ -206,7 +224,7 @@ function App() {
         {tab === 'perfil' && <Profile profile={profile} setProfile={setProfile} notify={setNotice} userId={me?.id} user={me} setMe={setMe} />}
         {tab === 'solicitudes' && <Requests requests={requests} form={requestForm} setForm={setRequestForm} submit={createRequest} calculate={calculate} />}
         {tab === 'coincidencias' && <ConnectionsExplorer matches={matches} requestId={selectedRequest} notify={setNotice} onRequestTopic={(topic: string) => { setRequestForm({ ...requestForm, topic, description: `Quiero encontrar una persona para aprender sobre ${topic}.`, helpType: 'comprender', desiredSchedule: '' }); navigate('solicitudes'); }} />}
-        {tab === 'mensajes' && <Messages connections={connections} selectedId={chatConnectionId} setSelectedId={setChatConnectionId} messagesByConnection={messagesByConnection} setMessagesByConnection={setMessagesByConnection} realtimeConnected={realtimeConnected} notify={setNotice} navigate={navigate} />}
+        {tab === 'mensajes' && <Messages connections={connections} selectedId={chatConnectionId} setSelectedId={setChatConnectionId} messagesByConnection={messagesByConnection} setMessagesByConnection={setMessagesByConnection} realtimeConnected={realtimeConnected} notify={setNotice} navigate={navigate} onlineUsers={onlineUsers} />}
         {tab === 'ranking' && <Ranking notify={setNotice} />}
         {tab === 'agenda' && <Agenda connections={connections} sessions={sessions} setConnections={setConnections} setSessions={setSessions} notify={setNotice} />}
         {tab === 'seguridad' && <Security connections={connections} notify={setNotice} />}
@@ -350,7 +368,7 @@ function RequestMatches({ matches, requestId, notify }: any) {
   return <section className="screen"><ScreenIntro kicker="COMPATIBILIDAD EXPLICABLE" title="Personas que pueden ayudarte" description="Cada recomendación incluye una razón clara. Tú decides con quién conectar." badge="network" />{!requestId || matches.length === 0 ? <EmptyState title="Todavía no hay conexiones sugeridas" text="Publica una solicitud y selecciona “Buscar compañeros” para ver recomendaciones." badge="network" /> : <div className="match-grid">{matches.map((item: any, index: number) => <article className="match-card" key={item.id}><div className="match-avatar">{initials(item.candidate)}<span>{index + 1}</span></div><div className="match-score"><strong>{Math.round(item.score)}%</strong><span>compatible</span></div><h3>{item.candidate}</h3><p>{item.explanation}</p><div className="reason-chips"><span>Tema afín</span><span>Horario compatible</span></div><div className="card-actions"><button className="button button-primary small" onClick={() => accept(item.id)}>Conectar</button><button className="button button-ghost small" onClick={() => reject(item.id)}>Ahora no</button></div></article>)}</div>}</section>;
 }
 
-function Messages({ connections, selectedId, setSelectedId, messagesByConnection, setMessagesByConnection, realtimeConnected, notify, navigate }: any) {
+function Messages({ connections, selectedId, setSelectedId, messagesByConnection, setMessagesByConnection, realtimeConnected, notify, navigate, onlineUsers }: any) {
   const active = connections.filter((item: any) => item.status === 'Activa' || item.status === 1);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
@@ -358,6 +376,7 @@ function Messages({ connections, selectedId, setSelectedId, messagesByConnection
   const [previewUrl, setPreviewUrl] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
+  const draftInput = useRef<HTMLTextAreaElement>(null);
   const messagesEnd = useRef<HTMLDivElement>(null);
   const isInitialOpen = useRef(true);
 
@@ -373,6 +392,7 @@ function Messages({ connections, selectedId, setSelectedId, messagesByConnection
     : (typeof window !== 'undefined' && window.innerWidth >= 900 ? (active[0]?.id ?? '') : '');
   const current = active.find((item: any) => item.id === currentId);
   const messages = currentId ? (messagesByConnection[currentId] ?? []) : [];
+  const isCurrentOnline = Boolean(current?.counterpartId && onlineUsers?.has(current.counterpartId));
 
   useEffect(() => {
     isInitialOpen.current = true;
@@ -391,6 +411,32 @@ function Messages({ connections, selectedId, setSelectedId, messagesByConnection
       isInitialOpen.current = false;
     }
   }, [messages.length, currentId]);
+
+  // Keep the composer readable while typing, especially above the mobile keyboard.
+  useEffect(() => {
+    const input = draftInput.current;
+    if (!input) return;
+    input.style.height = 'auto';
+    input.style.height = `${Math.min(input.scrollHeight, 128)}px`;
+    input.style.overflowY = input.scrollHeight > 128 ? 'auto' : 'hidden';
+  }, [draft]);
+
+  // Mobile browsers do not all update 100dvh consistently when the keyboard opens.
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const syncViewportHeight = () => {
+      document.documentElement.style.setProperty('--chat-viewport-height', `${viewport.height}px`);
+    };
+    syncViewportHeight();
+    viewport.addEventListener('resize', syncViewportHeight);
+    viewport.addEventListener('scroll', syncViewportHeight);
+    return () => {
+      viewport.removeEventListener('resize', syncViewportHeight);
+      viewport.removeEventListener('scroll', syncViewportHeight);
+      document.documentElement.style.removeProperty('--chat-viewport-height');
+    };
+  }, [currentId]);
 
   function clearFile() {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -514,6 +560,8 @@ function Messages({ connections, selectedId, setSelectedId, messagesByConnection
                 const timeLabel = lastMsg ? formatRelative(lastMsg.createdAt) : 'Nueva conexión';
                 const isSelected = item.id === currentId;
 
+                const isItemOnline = Boolean(item.counterpartId && onlineUsers?.has(item.counterpartId));
+
                 return (
                   <button
                     key={item.id}
@@ -524,7 +572,7 @@ function Messages({ connections, selectedId, setSelectedId, messagesByConnection
                       <span className={`contact-avatar-core story-tone-${index % 4}`}>
                         {initials(item.counterpart)}
                       </span>
-                      <i className={realtimeConnected ? 'status-dot online' : 'status-dot offline'} />
+                      <i className={`status-dot ${isItemOnline ? 'online' : 'offline'}`} />
                     </span>
                     <span className="contact-copy">
                       <span className="contact-copy-top">
@@ -559,12 +607,17 @@ function Messages({ connections, selectedId, setSelectedId, messagesByConnection
                   <Icon name="back" />
                 </button>
                 <div className="chat-person">
-                  <span className="chat-avatar">{initials(current?.counterpart)}</span>
+                  <div className="chat-avatar-wrapper">
+                    <span className="chat-avatar">{initials(current?.counterpart)}</span>
+                    <i className={`avatar-status-dot ${isCurrentOnline ? 'online' : 'offline'}`} aria-hidden="true" />
+                  </div>
                   <div className="chat-person-details">
                     <strong>{current?.counterpart}</strong>
                     <small>
                       <span>{current?.topic}</span>
-                      <span className="presence-text">{realtimeConnected ? ' · en línea' : ''}</span>
+                      <span className={`presence-text ${isCurrentOnline ? 'online' : 'offline'}`}>
+                        {isCurrentOnline ? ' · en línea' : ' · desconectado'}
+                      </span>
                     </small>
                   </div>
                 </div>
@@ -664,12 +717,15 @@ function Messages({ connections, selectedId, setSelectedId, messagesByConnection
                 >
                   ＋
                 </button>
-                <input
+                <textarea
+                  ref={draftInput}
                   value={draft}
                   onChange={event => setDraft(event.target.value)}
                   maxLength={1500}
+                  rows={1}
                   placeholder={selectedFile ? 'Agrega un comentario al archivo…' : 'Escribe un mensaje…'}
                   aria-label="Mensaje"
+                  enterKeyHint="send"
                 />
                 <button
                   type="submit"
@@ -681,7 +737,6 @@ function Messages({ connections, selectedId, setSelectedId, messagesByConnection
                   {sending ? '…' : '↗'}
                 </button>
               </div>
-              <small className="upload-limit">Imágenes y documentos · máximo 10 MB</small>
             </form>
           </section>
         ) : (
