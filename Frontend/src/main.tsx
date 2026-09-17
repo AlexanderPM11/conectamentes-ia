@@ -209,7 +209,12 @@ function App() {
   const primaryNavItems = navItems.slice(0, 4);
   const secondaryTabActive = ['perfil', 'ranking', 'agenda', 'seguridad', 'panel', 'admin'].includes(tab);
   const bottomActiveIndex = showMore || secondaryTabActive ? 4 : Math.max(0, primaryNavItems.findIndex(item => item.id === tab));
-  const isChatMobileActive = tab === 'mensajes' && Boolean(chatConnectionId);
+  const isChatMobileActive = tab === 'mensajes' && Boolean(chatConnectionId) && typeof window !== 'undefined' && window.innerWidth < 900;
+  const messagesView = <Messages connections={connections} selectedId={chatConnectionId} setSelectedId={setChatConnectionId} messagesByConnection={messagesByConnection} setMessagesByConnection={setMessagesByConnection} realtimeConnected={realtimeConnected} notify={setNotice} navigate={navigate} onlineUsers={onlineUsers} />;
+
+  // A conversation is a dedicated mobile surface, not a layer over the app shell.
+  // This keeps the keyboard, safe areas and scroll container in one layout context.
+  if (isChatMobileActive) return <><main className="mobile-chat-screen">{messagesView}</main><UpdatePrompt {...pwaUpdate} /></>;
 
   if (!logged) return <><Welcome mode={mode} setMode={setMode} notice={notice} busy={busy} submit={authSubmit} googleLogin={googleLogin} /><UpdatePrompt {...pwaUpdate} /></>;
 
@@ -224,7 +229,7 @@ function App() {
         {tab === 'perfil' && <Profile profile={profile} setProfile={setProfile} notify={setNotice} userId={me?.id} user={me} setMe={setMe} />}
         {tab === 'solicitudes' && <Requests requests={requests} form={requestForm} setForm={setRequestForm} submit={createRequest} calculate={calculate} />}
         {tab === 'coincidencias' && <ConnectionsExplorer matches={matches} requestId={selectedRequest} notify={setNotice} onRequestTopic={(topic: string) => { setRequestForm({ ...requestForm, topic, description: `Quiero encontrar una persona para aprender sobre ${topic}.`, helpType: 'comprender', desiredSchedule: '' }); navigate('solicitudes'); }} />}
-        {tab === 'mensajes' && <Messages connections={connections} selectedId={chatConnectionId} setSelectedId={setChatConnectionId} messagesByConnection={messagesByConnection} setMessagesByConnection={setMessagesByConnection} realtimeConnected={realtimeConnected} notify={setNotice} navigate={navigate} onlineUsers={onlineUsers} />}
+        {tab === 'mensajes' && messagesView}
         {tab === 'ranking' && <Ranking notify={setNotice} />}
         {tab === 'agenda' && <Agenda connections={connections} sessions={sessions} setConnections={setConnections} setSessions={setSessions} notify={setNotice} />}
         {tab === 'seguridad' && <Security connections={connections} notify={setNotice} />}
