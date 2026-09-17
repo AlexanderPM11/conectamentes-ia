@@ -409,18 +409,7 @@ function Requests({ requests, form, setForm, submit, calculate, notify }: any) {
       />
       <div className="content-grid requests-grid">
         <form className="surface-card form-surface simplified-request-form" onSubmit={submit}>
-          <div className="card-heading-row">
-            <CardHeading number="01" title="Nueva solicitud" text="Solo dos campos. Escribe directo o usa la IA." />
-            <button
-              type="button"
-              className="ai-trigger-button"
-              onClick={() => setShowAi(true)}
-              title="Redactar con Asistente IA"
-            >
-              <span className="ai-stars" aria-hidden="true">✨</span>
-              <span>Redactar con IA</span>
-            </button>
-          </div>
+          <CardHeading number="01" title="Nueva solicitud" text="Solo dos campos. Escribe lo que necesitas o toca el botón flotante de IA." />
 
           <label>
             ¿Sobre qué tema necesitas apoyo?
@@ -494,6 +483,23 @@ function Requests({ requests, form, setForm, submit, calculate, notify }: any) {
           </div>
         </section>
       </div>
+
+      <button
+        type="button"
+        className="ai-fab-button"
+        onClick={() => setShowAi(true)}
+        aria-label="Redactar con Asistente IA"
+        title="Redactar con Asistente IA"
+      >
+        <svg className="ai-fab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z" />
+          <path d="M5 3v4" />
+          <path d="M3 5h4" />
+          <path d="M19 17v4" />
+          <path d="M17 19h4" />
+        </svg>
+        <span className="ai-fab-pulse" aria-hidden="true" />
+      </button>
 
       <AiRequestDialog
         open={showAi}

@@ -107,42 +107,82 @@
   margin-bottom: 6px;
 }
 
-.ai-trigger-button {
-  display: inline-flex;
+.ai-fab-button {
+  position: fixed;
+  right: 20px;
+  bottom: calc(max(14px, env(safe-area-inset-bottom)) + 74px);
+  z-index: 38;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: linear-gradient(135deg, #173b35 0%, #24564d 55%, #c96d48 100%);
+  color: #fffdf8;
+  display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 8px 16px;
-  border: 1px solid #e5d2be;
-  border-radius: 99px;
-  background: linear-gradient(135deg, #fff9f0 0%, #faeee0 100%);
-  color: var(--forest);
-  font-family: inherit;
-  font-size: 0.82rem;
-  font-weight: 800;
+  justify-content: center;
+  box-shadow: 0 10px 26px rgba(23, 59, 53, 0.35), 0 0 16px rgba(201, 109, 72, 0.28);
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(201, 109, 72, 0.12);
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  padding: 0;
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.3, 1), box-shadow 0.22s ease;
 }
 
-.ai-trigger-button:hover {
-  transform: translateY(-2px);
-  border-color: var(--clay);
-  box-shadow: 0 6px 18px rgba(201, 109, 72, 0.22);
+.ai-fab-button:hover {
+  transform: scale(1.1) translateY(-3px);
+  box-shadow: 0 14px 34px rgba(23, 59, 53, 0.45), 0 0 24px rgba(201, 109, 72, 0.45);
 }
 
-.ai-trigger-button:active {
-  transform: translateY(0);
+.ai-fab-button:active {
+  transform: scale(0.94);
 }
 
-.ai-stars {
-  font-size: 1.05rem;
-  line-height: 1;
-  animation: ai-pulse 2.2s infinite ease-in-out;
+.ai-fab-icon {
+  width: 26px;
+  height: 26px;
+  stroke: #fffdf8;
+  animation: ai-fab-spin 4.5s infinite ease-in-out;
+  position: relative;
+  z-index: 2;
 }
 
-@keyframes ai-pulse {
-  0%, 100% { transform: scale(1) rotate(0deg); }
-  50% { transform: scale(1.2) rotate(8deg); }
+.ai-fab-pulse {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid rgba(201, 109, 72, 0.55);
+  animation: ai-fab-ping 2.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+  z-index: 1;
+  pointer-events: none;
+}
+
+@keyframes ai-fab-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  65%, 100% {
+    transform: scale(1.42);
+    opacity: 0;
+  }
+}
+
+@keyframes ai-fab-spin {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(10deg) scale(1.08); }
+  75% { transform: rotate(-10deg) scale(1.08); }
+}
+
+@media (min-width: 900px) {
+  .ai-fab-button {
+    right: 36px;
+    bottom: 36px;
+    width: 62px;
+    height: 62px;
+  }
+  .ai-fab-icon {
+    width: 28px;
+    height: 28px;
+  }
 }
 
 .ai-assistant-dialog {
