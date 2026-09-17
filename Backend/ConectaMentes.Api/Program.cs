@@ -31,6 +31,7 @@ builder.Services.AddSingleton<IUserTracker, InMemoryUserTracker>();
 builder.Services.Configure<FormOptions>(options => options.MultipartBodyLengthLimit = ChatAttachmentStorage.DefaultMaxBytes + 512 * 1024);
 builder.Services.AddSingleton<ChatAttachmentStorage>();
 builder.Services.AddSingleton<ProfileAvatarStorage>();
+builder.Services.AddHttpClient();
 builder.Services.AddHttpClient("GoogleCalendar", client => client.BaseAddress = new Uri("https://www.googleapis.com/"));
 builder.Services.AddScoped<GoogleCalendarService>();
 builder.Services.AddScoped<DevicePushService>();
@@ -251,11 +252,149 @@ profile.MapDelete("/habilidades/{id:guid}", async (Guid id, ClaimsPrincipal p, C
 profile.MapPut("/disponibilidad", async (AvailabilityRequest request, ClaimsPrincipal p, ConectaMentesDbContext db) => { var item = await db.Availabilities.SingleOrDefaultAsync(x => x.UserId == ApiIdentity.UserId(p)); if (item is null) { item = new Availability { UserId = ApiIdentity.UserId(p) }; db.Add(item); } item.TimeSlots = request.TimeSlots.Trim(); item.PreferredMode = request.PreferredMode; await db.SaveChangesAsync(); return Results.Ok(item); });
 
 var requests = secured.MapGroup("/solicitudes").WithTags("Solicitudes");
-requests.MapPost("", async (SupportRequestInput input, ClaimsPrincipal p, ConectaMentesDbContext db) => { if (string.IsNullOrWhiteSpace(input.Topic) || string.IsNullOrWhiteSpace(input.Description)) return Results.ValidationProblem(new Dictionary<string, string[]> { ["request"] = ["Tema y descripción son obligatorios."] }); var item = new SupportRequest { UserId = ApiIdentity.UserId(p), Topic = input.Topic.Trim(), Description = input.Description.Trim(), HelpType = input.HelpType.Trim(), DesiredSchedule = input.DesiredSchedule.Trim() }; db.Add(item); await db.SaveChangesAsync(); return Results.Created($"/api/solicitudes/{item.Id}", item); });
+requests.MapPost("", async (SupportRequestInput input, ClaimsPrincipal p, ConectaMentesDbContext db) => {
+    if (string.IsNullOrWhiteSpace(input.Topic) || string.IsNullOrWhiteSpace(input.Description))
+        return Results.ValidationProblem(new Dictionary<string, string[]> { ["request"] = ["Tema y descripción son obligatorios."] });
+    var item = new SupportRequest {
+        UserId = ApiIdentity.UserId(p),
+        Topic = input.Topic.Trim(),
+        Description = input.Description.Trim(),
+        HelpType = string.IsNullOrWhiteSpace(input.HelpType) ? "comprender" : input.HelpType.Trim(),
+        DesiredSchedule = string.IsNullOrWhiteSpace(input.DesiredSchedule) ? "" : input.DesiredSchedule.Trim()
+    };
+    db.Add(item);
+    await db.SaveChangesAsync();
+    return Results.Created($"/api/solicitudes/{item.Id}", item);
+});
 requests.MapGet("/mias", async (ClaimsPrincipal p, ConectaMentesDbContext db) => Results.Ok(await db.SupportRequests.Where(x => x.UserId == ApiIdentity.UserId(p)).OrderByDescending(x => x.CreatedAt).ToListAsync()));
 requests.MapGet("/{id:guid}", async (Guid id, ClaimsPrincipal p, ConectaMentesDbContext db) => await db.SupportRequests.SingleOrDefaultAsync(x => x.Id == id && x.UserId == ApiIdentity.UserId(p)) is { } item ? Results.Ok(item) : Results.NotFound());
-requests.MapPut("/{id:guid}", async (Guid id, SupportRequestInput input, ClaimsPrincipal p, ConectaMentesDbContext db) => { var item = await db.SupportRequests.SingleOrDefaultAsync(x => x.Id == id && x.UserId == ApiIdentity.UserId(p)); if (item is null || item.Status is RequestStatus.Cancelada or RequestStatus.Conectada) return Results.NotFound(); item.Topic = input.Topic.Trim(); item.Description = input.Description.Trim(); item.HelpType = input.HelpType.Trim(); item.DesiredSchedule = input.DesiredSchedule.Trim(); await db.SaveChangesAsync(); return Results.Ok(item); });
+requests.MapPut("/{id:guid}", async (Guid id, SupportRequestInput input, ClaimsPrincipal p, ConectaMentesDbContext db) => {
+    var item = await db.SupportRequests.SingleOrDefaultAsync(x => x.Id == id && x.UserId == ApiIdentity.UserId(p));
+    if (item is null || item.Status is RequestStatus.Cancelada or RequestStatus.Conectada) return Results.NotFound();
+    item.Topic = input.Topic.Trim();
+    item.Description = input.Description.Trim();
+    item.HelpType = string.IsNullOrWhiteSpace(input.HelpType) ? item.HelpType : input.HelpType.Trim();
+    item.DesiredSchedule = string.IsNullOrWhiteSpace(input.DesiredSchedule) ? item.DesiredSchedule : input.DesiredSchedule.Trim();
+    await db.SaveChangesAsync();
+    return Results.Ok(item);
+});
 requests.MapPost("/{id:guid}/cancelar", async (Guid id, ClaimsPrincipal p, ConectaMentesDbContext db) => { var item = await db.SupportRequests.SingleOrDefaultAsync(x => x.Id == id && x.UserId == ApiIdentity.UserId(p)); if (item is null) return Results.NotFound(); item.Status = RequestStatus.Cancelada; await db.SaveChangesAsync(); return Results.Ok(item); });
+requests.MapPost("/asistente-ia", async (AiSupportRequestPrompt input, IConfiguration config, IHttpClientFactory httpClientFactory) =>
+{
+    if (string.IsNullOrWhiteSpace(input.Prompt))
+        return Results.ValidationProblem(new Dictionary<string, string[]> { ["prompt"] = ["Por favor escribe lo que necesitas aprender."] });
+
+    var rawPrompt = input.Prompt.Trim();
+    string? suggestedTopic = null;
+    string? suggestedDescription = null;
+
+    var minimaxKey = config["MINIMAX_API_KEY"] ?? Environment.GetEnvironmentVariable("MINIMAX_API_KEY");
+    var openaiKey = config["OPENAI_API_KEY"] ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+    var groqKey = config["GROQ_API_KEY"] ?? Environment.GetEnvironmentVariable("GROQ_API_KEY");
+
+    if (!string.IsNullOrWhiteSpace(minimaxKey) || !string.IsNullOrWhiteSpace(openaiKey) || !string.IsNullOrWhiteSpace(groqKey))
+    {
+        try
+        {
+            var httpClient = httpClientFactory.CreateClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(15);
+            string endpoint;
+            string model;
+            string authKey;
+
+            if (!string.IsNullOrWhiteSpace(minimaxKey))
+            {
+                endpoint = "https://api.minimax.chat/v1/text/chatcompletion_v2";
+                model = "MiniMax-Text-01";
+                authKey = minimaxKey;
+            }
+            else if (!string.IsNullOrWhiteSpace(groqKey))
+            {
+                endpoint = "https://api.groq.com/openai/v1/chat/completions";
+                model = "llama-3.3-70b-versatile";
+                authKey = groqKey;
+            }
+            else
+            {
+                endpoint = "https://api.openai.com/v1/chat/completions";
+                model = "gpt-4o-mini";
+                authKey = openaiKey!;
+            }
+
+            var requestBody = new
+            {
+                model = model,
+                messages = new object[]
+                {
+                    new
+                    {
+                        role = "system",
+                        content = "Eres el asistente pedagógico de ConectaMentes IA. Tu función es ayudar a un estudiante universitario a estructurar una solicitud de estudio entre pares a partir de lo que expresa con sus palabras.\nGenera ÚNICAMENTE un JSON válido con dos campos de texto:\n1. \"topic\": Título o materia académico preciso y conciso (máximo 50 caracteres, ej: \"Cálculo: Regla de la cadena\", \"Python: Funciones recursivas\").\n2. \"description\": Explicación orientada al aprendizaje colaborativo y comprensión (máximo 220 caracteres, ej: \"Quiero comprender los pasos de la regla de la cadena y practicar ejercicios paso a paso para prepararme bien.\").\nRegla crucial: La solicitud debe promover el aprendizaje y la colaboración, NUNCA pedir que alguien haga tareas o exámenes por el estudiante.\nDevuelve ÚNICAMENTE el objeto JSON sin formato markdown."
+                    },
+                    new
+                    {
+                        role = "user",
+                        content = rawPrompt
+                    }
+                },
+                temperature = 0.3
+            };
+
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint);
+            httpRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", authKey);
+            httpRequest.Content = new StringContent(System.Text.Json.JsonSerializer.Serialize(requestBody), System.Text.Encoding.UTF8, "application/json");
+
+            var response = await httpClient.SendAsync(httpRequest);
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                using var doc = System.Text.Json.JsonDocument.Parse(content);
+                var root = doc.RootElement;
+                string? messageText = null;
+
+                if (root.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
+                {
+                    var firstChoice = choices[0];
+                    if (firstChoice.TryGetProperty("message", out var message) && message.TryGetProperty("content", out var msgContent))
+                    {
+                        messageText = msgContent.GetString();
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(messageText))
+                {
+                    var cleaned = messageText.Trim();
+                    if (cleaned.StartsWith("```"))
+                    {
+                        var start = cleaned.IndexOf('\n');
+                        var end = cleaned.LastIndexOf("```");
+                        if (start >= 0 && end > start) cleaned = cleaned.Substring(start + 1, end - start - 1).Trim();
+                    }
+
+                    using var parsedDoc = System.Text.Json.JsonDocument.Parse(cleaned);
+                    if (parsedDoc.RootElement.TryGetProperty("topic", out var t) && parsedDoc.RootElement.TryGetProperty("description", out var d))
+                    {
+                        suggestedTopic = t.GetString()?.Trim();
+                        suggestedDescription = d.GetString()?.Trim();
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Fall back to built-in semantic processor
+        }
+    }
+
+    if (string.IsNullOrWhiteSpace(suggestedTopic) || string.IsNullOrWhiteSpace(suggestedDescription))
+    {
+        var (t, d) = GenerateAcademicFallback(rawPrompt);
+        suggestedTopic = t;
+        suggestedDescription = d;
+    }
+
+    return Results.Ok(new AiSupportRequestSuggestion(suggestedTopic, suggestedDescription));
+});
 
 var matches = secured.MapGroup("/solicitudes/{requestId:guid}").WithTags("Coincidencias");
 matches.MapPost("/calcular-coincidencias", async (Guid requestId, ClaimsPrincipal p, ConectaMentesDbContext db) => { var request = await db.SupportRequests.SingleOrDefaultAsync(x => x.Id == requestId && x.UserId == ApiIdentity.UserId(p)); if (request is null) return Results.NotFound(); var topic = request.Topic.ToLower(); var blocked = await db.Blocks.Where(x => x.UserId == ApiIdentity.UserId(p)).Select(x => x.BlockedUserId).ToListAsync(); var candidates = await db.SkillProfiles.Where(x => x.Type == SkillType.Domina && x.UserId != ApiIdentity.UserId(p) && !blocked.Contains(x.UserId) && x.Topic.ToLower() == topic).ToListAsync(); var old = db.Matches.Where(x => x.RequestId == requestId); db.RemoveRange(old); foreach (var candidate in candidates.Take(10)) db.Matches.Add(new Match { RequestId = requestId, CandidateUserId = candidate.UserId, Score = Math.Round(candidate.Confidence * 20m, 2), Explanation = $"Domina {candidate.Topic} y puede apoyarte con tu objetivo." }); request.Status = candidates.Count > 0 ? RequestStatus.ConCoincidencias : RequestStatus.Abierta; await db.SaveChangesAsync(); return Results.Ok(candidates.Count); });
@@ -754,6 +893,83 @@ async Task EnsureIndexAsync(ConectaMentesDbContext db, string tableName, string 
     await db.Database.ExecuteSqlRawAsync(statement);
 }
 
+static (string Topic, string Description) GenerateAcademicFallback(string prompt)
+{
+    var lower = prompt.ToLowerInvariant();
+    string subject = "Estudio académico";
+
+    if (lower.Contains("calculo") || lower.Contains("cálculo") || lower.Contains("integral") || lower.Contains("derivada") || lower.Contains("limite") || lower.Contains("límite"))
+        subject = "Cálculo";
+    else if (lower.Contains("algebra") || lower.Contains("álgebra") || lower.Contains("matriz") || lower.Contains("vectores"))
+        subject = "Álgebra lineal";
+    else if (lower.Contains("programaci") || lower.Contains("python") || lower.Contains("java") || lower.Contains("c#") || lower.Contains("c++") || lower.Contains("javascript") || lower.Contains("codigo") || lower.Contains("código") || lower.Contains("algoritmo") || lower.Contains("react"))
+        subject = "Programación";
+    else if (lower.Contains("base de datos") || lower.Contains("sql") || lower.Contains("mysql") || lower.Contains("postgres"))
+        subject = "Bases de datos";
+    else if (lower.Contains("fisica") || lower.Contains("física") || lower.Contains("newton") || lower.Contains("cinematica") || lower.Contains("cinemática") || lower.Contains("termodinamica"))
+        subject = "Física";
+    else if (lower.Contains("quimica") || lower.Contains("química") || lower.Contains("estequiometria") || lower.Contains("molar"))
+        subject = "Química";
+    else if (lower.Contains("estadistica") || lower.Contains("estadística") || lower.Contains("probabilidad") || lower.Contains("regresion"))
+        subject = "Estadística";
+    else if (lower.Contains("ingles") || lower.Contains("inglés") || lower.Contains("grammar") || lower.Contains("speaking") || lower.Contains("listening"))
+        subject = "Inglés";
+    else if (lower.Contains("economia") || lower.Contains("economía") || lower.Contains("contabilidad") || lower.Contains("finanzas"))
+        subject = "Economía y Finanzas";
+
+    var clean = prompt
+        .Replace("no entiendo nada de", "", StringComparison.OrdinalIgnoreCase)
+        .Replace("no entiendo", "", StringComparison.OrdinalIgnoreCase)
+        .Replace("tengo problemas con", "", StringComparison.OrdinalIgnoreCase)
+        .Replace("ayuda con", "", StringComparison.OrdinalIgnoreCase)
+        .Replace("necesito ayuda en", "", StringComparison.OrdinalIgnoreCase)
+        .Replace("necesito ayuda con", "", StringComparison.OrdinalIgnoreCase)
+        .Replace("quiero aprender", "", StringComparison.OrdinalIgnoreCase)
+        .Replace("tengo examen de", "", StringComparison.OrdinalIgnoreCase)
+        .Trim(' ', '.', ',', '!', '?', ';', ':');
+
+    if (clean.Length > 0)
+    {
+        clean = char.ToUpper(clean[0]) + clean.Substring(1);
+    }
+    else
+    {
+        clean = prompt.Trim();
+    }
+
+    string topic;
+    if (clean.Length > 35)
+    {
+        var words = clean.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var shortConcept = string.Join(" ", words.Take(4));
+        topic = subject != "Estudio académico" ? $"{subject}: {shortConcept}" : shortConcept;
+    }
+    else if (!string.IsNullOrWhiteSpace(clean))
+    {
+        topic = subject != "Estudio académico" && !clean.Contains(subject, StringComparison.OrdinalIgnoreCase)
+            ? $"{subject}: {clean}"
+            : clean;
+    }
+    else
+    {
+        topic = subject;
+    }
+
+    if (topic.Length > 50) topic = topic.Substring(0, 47) + "...";
+
+    string description;
+    if (!string.IsNullOrWhiteSpace(clean))
+    {
+        description = $"Busco orientación para comprender {clean.ToLowerInvariant()}, reforzar conceptos clave y resolver ejercicios de práctica colaborativa.";
+    }
+    else
+    {
+        description = "Quiero comprender los conceptos fundamentales de este tema y resolver dudas con el apoyo de un compañero.";
+    }
+
+    return (topic, description);
+}
+
 app.Run();
 
 public partial class Program;
@@ -764,7 +980,9 @@ public sealed record LoginRequest(string Email, string Password);
 public sealed record GoogleLoginRequest(string Credential);
 public sealed record SkillRequest(string Topic, SkillType Type, int Confidence, bool Visible = true);
 public sealed record AvailabilityRequest(string TimeSlots, string PreferredMode);
-public sealed record SupportRequestInput(string Topic, string Description, string HelpType, string DesiredSchedule);
+public sealed record SupportRequestInput(string Topic, string Description, string? HelpType = "comprender", string? DesiredSchedule = "");
+public sealed record AiSupportRequestPrompt(string Prompt);
+public sealed record AiSupportRequestSuggestion(string Topic, string Description);
 public sealed record ConnectionResponse(bool Accept);
 public sealed record ChatMessageInput(string Text);
 public sealed record SessionInput(DateTimeOffset Date, int DurationMinutes, string Mode, string Objective);
