@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text;
 using ConectaMentes.Api;
 using ConectaMentes.Api.Auth;
+using ConectaMentes.Api.Endpoints;
 using ConectaMentes.Application.Auth;
 using ConectaMentes.Application.Reputation;
 using ConectaMentes.Domain.Entities;
@@ -141,9 +142,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 if (app.Environment.IsDevelopment()) { app.UseSwagger(); app.UseSwaggerUI(); }
 
-app.MapHealthChecks("/health").WithTags("System");
-app.MapHub<RealtimeHub>("/hubs/realtime");
-app.MapGet("/api/v1", () => Results.Ok(new { name = "ConectaMentes IA API", version = "v1", status = "ready" })).WithTags("System").WithOpenApi();
+app.MapSystemEndpoints();
 
 var auth = app.MapGroup("/api/auth").WithTags("Autenticación");
 auth.MapPost("/registro", async (RegisterRequest request, IAuthService service, CancellationToken ct) =>

@@ -1,9 +1,9 @@
 import { ChangeEvent, CSSProperties, FormEvent, Fragment, StrictMode, useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
+import { API, api } from './shared/api/client';
 import './styles.css';
 
-const API = import.meta.env.VITE_API_URL || '';
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
 const MAX_CHAT_FILE_BYTES = 10 * 1024 * 1024;
 const CHAT_FILE_ACCEPT = '.jpg,.jpeg,.png,.webp,.gif,.pdf,.docx,.xlsx,.pptx,.txt';
@@ -27,14 +27,6 @@ const navItems: { id: Tab; label: string; icon: IconName }[] = [
   { id: 'panel', label: 'Panel', icon: 'chart' },
   { id: 'admin', label: 'Administración', icon: 'shield' }
 ];
-
-async function api(path: string, options: RequestInit = {}) {
-  const token = localStorage.getItem('conectamente_token');
-  const isForm = options.body instanceof FormData;
-  const response = await fetch(API + path, { cache: 'no-store', ...options, headers: { ...(isForm ? {} : { 'Content-Type': 'application/json' }), ...(token ? { Authorization: 'Bearer ' + token } : {}), ...options.headers } });
-  if (!response.ok) { let detail = ''; try { const problem = await response.json(); detail = problem.detail ?? problem.message ?? Object.values(problem.errors ?? {}).flat().find(Boolean) ?? ''; } catch { /* La respuesta puede no incluir JSON. */ } throw new Error(response.status === 401 ? 'Tu sesión ha expirado.' : String(detail || 'No pudimos completar esta acción.')); }
-  return response.status === 204 ? null : response.json();
-}
 
 function urlBase64ToUint8Array(value: string) {
   const clean = value.trim();

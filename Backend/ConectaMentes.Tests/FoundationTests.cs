@@ -27,7 +27,7 @@ public class FoundationTests
     {
         var repository = new MemoryUsers();
         var service = new AuthService(repository, new FakeTokenService());
-        var command = new RegisterCommand("Ana@Example.com", "correcta-123", "Ana", "Ingeniería", "3");
+        var command = new RegisterCommand("Ana@Example.com", "correcta-123", "Ana");
 
         var registered = await service.RegisterAsync(command, CancellationToken.None);
         var loggedIn = await service.LoginAsync(new LoginCommand("ana@example.com", "correcta-123"), CancellationToken.None);
