@@ -27,6 +27,7 @@ builder.Services.AddHealthChecks();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR();
+builder.Services.AddSingleton<IUserTracker, InMemoryUserTracker>();
 builder.Services.Configure<FormOptions>(options => options.MultipartBodyLengthLimit = ChatAttachmentStorage.DefaultMaxBytes + 512 * 1024);
 builder.Services.AddSingleton<ChatAttachmentStorage>();
 builder.Services.AddSingleton<ProfileAvatarStorage>();
@@ -189,6 +190,8 @@ app.MapGet("/api/usuarios/{id:guid}/avatar", async (Guid id, ClaimsPrincipal pri
     var path = avatars.Resolve(user.AvatarPath);
     return File.Exists(path) ? Results.File(path, GetAvatarContentType(user.AvatarPath)) : Results.NotFound();
 }).RequireAuthorization().WithTags("Usuarios").WithName("GetUserAvatar").WithOpenApi();
+
+app.MapGet("/api/usuarios/conectados", (IUserTracker tracker) => Results.Ok(tracker.GetOnlineUsers())).RequireAuthorization().WithTags("Usuarios").WithName("GetOnlineUsers").WithOpenApi();
 
 var secured = app.MapGroup("/api").RequireAuthorization();
 
