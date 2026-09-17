@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Icon } from './Icon';
 
 export function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCancel }: { title: string; message: string; confirmLabel: string; onConfirm: () => void; onCancel: () => void }) {
@@ -10,7 +11,7 @@ export function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCance
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onCancel]);
 
-  return (
+  return createPortal(
     <div className="custom-dialog-backdrop" role="presentation" onMouseDown={event => { if (event.currentTarget === event.target) onCancel(); }}>
       <section className="custom-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title" aria-describedby="confirm-dialog-message">
         <div className="custom-dialog-head">
@@ -25,6 +26,7 @@ export function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCance
           <button type="button" className="button button-danger" onClick={onConfirm}>{confirmLabel}</button>
         </div>
       </section>
-    </div>
+    </div>,
+    document.body
   );
 }
