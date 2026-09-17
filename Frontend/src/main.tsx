@@ -426,23 +426,6 @@ function Messages({ connections, selectedId, setSelectedId, messagesByConnection
     input.style.overflowY = input.scrollHeight > 128 ? 'auto' : 'hidden';
   }, [draft]);
 
-  // Mobile browsers do not all update 100dvh consistently when the keyboard opens.
-  useEffect(() => {
-    const viewport = window.visualViewport;
-    if (!viewport) return;
-    const syncViewportHeight = () => {
-      document.documentElement.style.setProperty('--chat-viewport-height', `${viewport.height}px`);
-    };
-    syncViewportHeight();
-    viewport.addEventListener('resize', syncViewportHeight);
-    viewport.addEventListener('scroll', syncViewportHeight);
-    return () => {
-      viewport.removeEventListener('resize', syncViewportHeight);
-      viewport.removeEventListener('scroll', syncViewportHeight);
-      document.documentElement.style.removeProperty('--chat-viewport-height');
-    };
-  }, [currentId]);
-
   function clearFile() {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl('');

@@ -19,8 +19,9 @@
     z-index: 100;
     inset: 0;
     width: 100vw;
-    height: var(--chat-viewport-height, 100dvh);
-    max-height: var(--chat-viewport-height, 100dvh);
+    height: 100dvh;
+    min-height: 100svh;
+    max-height: 100dvh;
     overflow: hidden;
     background: #f7f4ee;
   }
@@ -28,8 +29,8 @@
   .mobile-chat-screen .chat-screen,
   .mobile-chat-screen .chat-layout,
   .mobile-chat-screen .chat-card {
-    height: var(--chat-viewport-height, 100dvh);
-    max-height: var(--chat-viewport-height, 100dvh);
+    height: 100dvh;
+    max-height: 100dvh;
   }
 
   .mobile-chat-screen .chat-screen {
@@ -66,9 +67,9 @@
     position: fixed;
     inset: 0;
     width: 100vw;
-    height: var(--chat-viewport-height, 100dvh);
-    min-height: var(--chat-viewport-height, 100dvh);
-    max-height: var(--chat-viewport-height, 100dvh);
+    height: 100dvh;
+    min-height: 100svh;
+    max-height: 100dvh;
     overflow: hidden;
     background: var(--cream);
   }
@@ -79,33 +80,33 @@
   }
 
   .app-layout.in-chat-mobile .app-main {
-    height: var(--chat-viewport-height, 100dvh);
-    min-height: var(--chat-viewport-height, 100dvh);
-    max-height: var(--chat-viewport-height, 100dvh);
+    height: 100dvh;
+    min-height: 100svh;
+    max-height: 100dvh;
     overflow: hidden;
   }
 
   .app-layout.in-chat-mobile .screen-content {
     width: 100% !important;
     max-width: 100% !important;
-    height: var(--chat-viewport-height, 100dvh) !important;
-    max-height: var(--chat-viewport-height, 100dvh) !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
     margin: 0 !important;
     padding: 0 !important;
     overflow: hidden;
   }
 
   .app-layout.in-chat-mobile .chat-screen {
-    height: var(--chat-viewport-height, 100dvh);
-    max-height: var(--chat-viewport-height, 100dvh);
+    height: 100dvh;
+    max-height: 100dvh;
     margin: 0;
     padding: 0;
     overflow: hidden;
   }
 
   .app-layout.in-chat-mobile .chat-layout {
-    height: var(--chat-viewport-height, 100dvh);
-    max-height: var(--chat-viewport-height, 100dvh);
+    height: 100dvh;
+    max-height: 100dvh;
     gap: 0;
     margin: 0;
   }
@@ -123,8 +124,8 @@
   /* Full screen chat card on mobile */
   .chat-layout.showing-conversation .chat-card {
     display: grid !important;
-    height: var(--chat-viewport-height, 100dvh) !important;
-    max-height: var(--chat-viewport-height, 100dvh) !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
     border: 0 !important;
     border-radius: 0 !important;
     box-shadow: none !important;
