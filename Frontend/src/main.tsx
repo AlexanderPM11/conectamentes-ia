@@ -209,11 +209,12 @@ function App() {
   const primaryNavItems = navItems.slice(0, 4);
   const secondaryTabActive = ['perfil', 'ranking', 'agenda', 'seguridad', 'panel', 'admin'].includes(tab);
   const bottomActiveIndex = showMore || secondaryTabActive ? 4 : Math.max(0, primaryNavItems.findIndex(item => item.id === tab));
-  const isChatMobileActive = tab === 'mensajes' && Boolean(chatConnectionId) && typeof window !== 'undefined' && window.innerWidth < 900;
+  const isChatActive = tab === 'mensajes';
+  const isChatMobileConversation = isChatActive && Boolean(chatConnectionId) && typeof window !== 'undefined' && window.innerWidth < 900;
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
   useEffect(() => {
-    if (!isChatMobileActive || typeof window === 'undefined') return;
+    if (!isChatMobileConversation || typeof window === 'undefined') return;
 
     const syncViewport = () => {
       const vv = window.visualViewport;
@@ -255,17 +256,13 @@ function App() {
       document.documentElement.classList.remove('mobile-chat-open');
       document.body.classList.remove('mobile-chat-open');
     };
-  }, [isChatMobileActive]);
+  }, [isChatMobileConversation]);
 
   const messagesView = <Messages connections={connections} selectedId={chatConnectionId} setSelectedId={setChatConnectionId} messagesByConnection={messagesByConnection} setMessagesByConnection={setMessagesByConnection} realtimeConnected={realtimeConnected} notify={setNotice} navigate={navigate} onlineUsers={onlineUsers} />;
 
-  // A conversation is a dedicated mobile surface, not a layer over the app shell.
-  // This keeps the keyboard, safe areas and scroll container in one layout context.
-  if (isChatMobileActive) return <><main className={`mobile-chat-screen ${isKeyboardOpen ? 'keyboard-open' : ''}`}>{messagesView}</main><UpdatePrompt {...pwaUpdate} /></>;
-
   if (!logged) return <><Welcome mode={mode} setMode={setMode} notice={notice} busy={busy} submit={authSubmit} googleLogin={googleLogin} /><UpdatePrompt {...pwaUpdate} /></>;
 
-  return <><div className={`app-layout ${isChatMobileActive ? 'in-chat-mobile' : ''}`}>
+  return <><div className={`app-layout ${isChatActive ? 'in-chat-screen' : ''} ${isChatMobileConversation ? 'in-chat-mobile in-conversation-active' : ''} ${isKeyboardOpen ? 'keyboard-open' : ''}`}>
     <aside className="sidebar"><Brand /><nav className="side-nav" aria-label="Navegación principal">{availableNavItems.map(item => <NavButton key={item.id} item={item} active={tab === item.id} onClick={() => navigate(item.id)} />)}</nav><div className="sidebar-note"><IsoBadge kind="network" /><p>Conexiones cuidadas, aprendizaje compartido.</p></div></aside>
     <main className="app-main">
       <header className="mobile-header"><Brand /><div className="header-actions"><NotificationButton count={unreadCount} onClick={() => setShowNotifications(true)} /><button className="avatar-button" aria-label="Abrir perfil" onClick={() => navigate('perfil')}><ProfileAvatar userId={me?.id} name={me?.displayName} version={me?.avatarUpdatedAt} /></button></div></header>

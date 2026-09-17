@@ -25,90 +25,7 @@ body.mobile-chat-open {
   overscroll-behavior: none !important;
 }
 
-/* Dedicated mobile conversation surface. Matches the visual viewport height above keyboard. */
-@media (max-width: 899px) {
-  .mobile-chat-screen {
-    position: fixed !important;
-    z-index: 100 !important;
-    top: var(--chat-vt, 0px) !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: auto !important;
-    width: 100vw !important;
-    height: var(--chat-vh, 100dvh) !important;
-    max-height: var(--chat-vh, 100dvh) !important;
-    overflow: hidden !important;
-    background: #f7f4ee !important;
-    display: flex !important;
-    flex-direction: column !important;
-  }
 
-  .mobile-chat-screen .chat-screen {
-    display: flex !important;
-    flex-direction: column !important;
-    height: 100% !important;
-    max-height: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    overflow: hidden !important;
-  }
-
-  .mobile-chat-screen .chat-layout {
-    display: flex !important;
-    flex-direction: column !important;
-    flex: 1 1 auto !important;
-    height: 100% !important;
-    max-height: 100% !important;
-    gap: 0 !important;
-    margin: 0 !important;
-    overflow: hidden !important;
-  }
-
-  .mobile-chat-screen .conversation-list {
-    display: none !important;
-  }
-
-  .mobile-chat-screen .chat-card {
-    display: grid !important;
-    grid-template-rows: auto minmax(0, 1fr) auto !important;
-    flex: 1 1 auto !important;
-    height: 100% !important;
-    max-height: 100% !important;
-    border: 0 !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    overflow: hidden !important;
-    background: #f7f4ee !important;
-  }
-
-  .mobile-chat-screen .chat-card-header {
-    flex-shrink: 0 !important;
-    position: relative !important;
-    top: 0 !important;
-    z-index: 20 !important;
-  }
-
-  .mobile-chat-screen .messages-scroll {
-    flex: 1 1 auto !important;
-    height: 100% !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch !important;
-    overscroll-behavior-y: contain !important;
-  }
-
-  .mobile-chat-screen .message-composer {
-    flex-shrink: 0 !important;
-    position: relative !important;
-    bottom: 0 !important;
-    z-index: 20 !important;
-  }
-
-  .mobile-chat-screen.keyboard-open .message-composer {
-    padding: 8px 12px 8px !important;
-  }
-}
 
 /* ========================================================================== 
    MOBILE FULL-SCREEN CONVERSATION MODE (< 900px)
@@ -222,30 +139,43 @@ body.mobile-chat-open {
    DESKTOP DUAL-COLUMN LAYOUT (>= 900px)
    ========================================================================== */
 @media (min-width: 900px) {
+  .app-layout.in-chat-screen .screen-content {
+    width: 100% !important;
+    max-width: 1440px !important;
+    height: calc(100vh - 74px) !important;
+    padding: 14px 24px !important;
+    margin: 0 auto !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
   .chat-screen {
-    height: calc(100dvh - 130px);
-    max-height: 840px;
-    min-height: 580px;
+    height: 100% !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
   }
 
   .chat-screen .screen-intro {
-    margin-bottom: 14px;
-    flex-shrink: 0;
+    display: none !important;
   }
 
   .chat-layout {
-    grid-template-columns: 320px minmax(0, 1fr);
-    gap: 18px;
-    flex: 1;
-    min-height: 0;
-    height: 100%;
+    grid-template-columns: 340px minmax(0, 1fr) !important;
+    gap: 16px !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: 100% !important;
   }
 
   .conversation-list {
     display: flex !important;
     flex-direction: column;
-    height: 100%;
-    min-height: 0;
+    height: 100% !important;
+    min-height: 0 !important;
     border: 1px solid var(--line);
     border-radius: 24px;
     background: var(--paper);
@@ -255,13 +185,13 @@ body.mobile-chat-open {
 
   .chat-card {
     display: grid !important;
-    height: 100%;
-    min-height: 0;
+    height: 100% !important;
+    min-height: 0 !important;
     border: 1px solid var(--line);
     border-radius: 24px;
     background: #f7f4ee;
     box-shadow: 0 16px 40px rgba(23, 59, 53, 0.07);
-    grid-template-rows: auto 1fr auto !important;
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
     overflow: hidden;
   }
 
