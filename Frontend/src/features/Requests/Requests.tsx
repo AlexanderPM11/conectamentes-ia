@@ -1,10 +1,17 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { api } from '../../shared/api/client';
-import { ScreenIntro, CardHeading, IsoBadge, Icon, EmptyState } from '../../components';
+import { ScreenIntro, CardHeading, IsoBadge, Icon, EmptyState, ConfirmDialog } from '../../components';
 
 function humanStatus(status: unknown) { return String(status ?? 'abierta').replaceAll('_', ' ').replace(/^./, value => value.toUpperCase()); }
 
-export function Requests({ requests, form, setForm, submit, calculate }: any) {
+export function Requests({ requests, form, setForm, submit, calculate, editingRequest, setEditingRequest, deleteRequest }: any) {
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  function handleEditClick(item: any) {
+    setForm({ topic: item.topic, description: item.description, helpType: item.helpType || 'comprender', desiredSchedule: item.desiredSchedule || '' });
+    setEditingRequest(item.id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
   return (
     <section className="screen">
       <ScreenIntro
@@ -15,7 +22,14 @@ export function Requests({ requests, form, setForm, submit, calculate }: any) {
       />
       <div className="content-grid requests-grid">
         <form className="surface-card form-surface simplified-request-form" onSubmit={submit}>
-          <CardHeading number="01" title="Nueva solicitud" text="Solo dos campos. Escribe lo que necesitas o toca el botón flotante de IA." />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <CardHeading number="01" title={editingRequest ? "Editar solicitud" : "Nueva solicitud"} text={editingRequest ? "Modifica los detalles de tu solicitud." : "Solo dos campos. Escribe lo que necesitas o toca el botón flotante de IA."} />
+            {editingRequest && (
+              <button type="button" className="button button-secondary small" onClick={() => { setEditingRequest(null); setForm({ topic: '', description: '', helpType: 'comprender', desiredSchedule: '' }); }}>
+                Cancelar edición
+              </button>
+            )}
+          </div>
 
           <label>
             ¿Sobre qué tema necesitas apoyo?
@@ -52,7 +66,7 @@ export function Requests({ requests, form, setForm, submit, calculate }: any) {
           </div>
 
           <button className="button button-primary">
-            Encontrar apoyo <span>→</span>
+            {editingRequest ? 'Guardar cambios' : 'Encontrar apoyo'} <span>{editingRequest ? '✓' : '→'}</span>
           </button>
         </form>
 
@@ -74,9 +88,17 @@ export function Requests({ requests, form, setForm, submit, calculate }: any) {
                   </div>
                   <h3>{item.topic}</h3>
                   <p>{item.description}</p>
-                  <button type="button" className="button button-secondary small" onClick={() => calculate(item.id)}>
-                    Buscar compañeros <span>→</span>
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '16px' }}>
+                    <button type="button" className="button button-secondary small" onClick={() => calculate(item.id)}>
+                      Buscar compañeros <span>→</span>
+                    </button>
+                    <button type="button" className="button button-secondary small icon-button" title="Editar" onClick={() => handleEditClick(item)} aria-label="Editar solicitud">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    </button>
+                    <button type="button" className="button button-secondary small icon-button" title="Eliminar" onClick={() => setDeletingId(item.id)} aria-label="Eliminar solicitud" style={{ color: 'var(--error)' }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </button>
+                  </div>
                 </article>
               ))
             ) : (
@@ -89,6 +111,18 @@ export function Requests({ requests, form, setForm, submit, calculate }: any) {
           </div>
         </section>
       </div>
+      {deletingId && (
+        <ConfirmDialog
+          title="Eliminar solicitud"
+          message="¿Estás seguro de que quieres eliminar esta solicitud de apoyo? Esta acción no se puede deshacer."
+          confirmLabel="Eliminar solicitud"
+          onConfirm={() => {
+            deleteRequest(deletingId);
+            setDeletingId(null);
+          }}
+          onCancel={() => setDeletingId(null)}
+        />
+      )}
     </section>
   );
 }

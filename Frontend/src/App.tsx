@@ -56,6 +56,7 @@ export function App() {
   const [realtimeConnected, setRealtimeConnected] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [requestForm, setRequestForm] = useState({ topic: '', description: '', helpType: 'comprender', desiredSchedule: '' });
+  const [editingRequest, setEditingRequest] = useState<string | null>(null);
   const [showAiDialog, setShowAiDialog] = useState(false);
   const [logged, setLogged] = useState(() => Boolean(localStorage.getItem('conectamente_token')));
   
@@ -172,14 +173,32 @@ export function App() {
     } catch (error) { showError(error); } 
   }
   
-  async function createRequest(event: FormEvent) { 
+  async function submitRequest(event: FormEvent) { 
     event.preventDefault(); 
     try { 
-      await api('/api/solicitudes', { method: 'POST', body: JSON.stringify(requestForm) }); 
+      if (editingRequest) {
+        await api('/api/solicitudes/' + editingRequest, { method: 'PUT', body: JSON.stringify(requestForm) }); 
+        setNotice('Solicitud actualizada correctamente.'); 
+        setEditingRequest(null);
+      } else {
+        await api('/api/solicitudes', { method: 'POST', body: JSON.stringify(requestForm) }); 
+        setNotice('Solicitud publicada. Ya puedes buscar compañeros compatibles.'); 
+      }
       setRequestForm({ topic: '', description: '', helpType: 'comprender', desiredSchedule: '' }); 
-      setNotice('Solicitud publicada. Ya puedes buscar compañeros compatibles.'); 
       setRequests(await api('/api/solicitudes/mias')); 
     } catch (error) { showError(error); } 
+  }
+
+  async function deleteRequest(id: string) {
+    try {
+      await api('/api/solicitudes/' + id, { method: 'DELETE' });
+      setNotice('Solicitud eliminada correctamente.');
+      if (editingRequest === id) {
+        setEditingRequest(null);
+        setRequestForm({ topic: '', description: '', helpType: 'comprender', desiredSchedule: '' });
+      }
+      setRequests(await api('/api/solicitudes/mias'));
+    } catch (error) { showError(error); }
   }
   
   async function calculate(requestId: string) { 
@@ -319,7 +338,7 @@ export function App() {
             {notice && <div className="toast" role="status"><span>✓</span>{notice}<button onClick={() => setNotice('')} aria-label="Cerrar mensaje">×</button></div>}
             {tab === 'inicio' && <Home me={me} profile={profile} requests={requests} connections={connections} navigate={navigate} />}
             {tab === 'perfil' && <Profile profile={profile} setProfile={setProfile} notify={setNotice} userId={me?.id} user={me} setMe={setMe} />}
-            {tab === 'solicitudes' && <Requests requests={requests} form={requestForm} setForm={setRequestForm} submit={createRequest} calculate={calculate} notify={setNotice} />}
+            {tab === 'solicitudes' && <Requests requests={requests} form={requestForm} setForm={setRequestForm} submit={submitRequest} calculate={calculate} notify={setNotice} editingRequest={editingRequest} setEditingRequest={setEditingRequest} deleteRequest={deleteRequest} />}
             {tab === 'coincidencias' && <ConnectionsExplorer matches={matches} requestId={selectedRequest} notify={setNotice} onRequestTopic={(topic: string) => { setRequestForm({ ...requestForm, topic, description: `Quiero encontrar una persona para aprender sobre ${topic}.`, helpType: 'comprender', desiredSchedule: '' }); navigate('solicitudes'); }} />}
             {tab === 'mensajes' && messagesView}
             {tab === 'ranking' && <Ranking notify={setNotice} />}

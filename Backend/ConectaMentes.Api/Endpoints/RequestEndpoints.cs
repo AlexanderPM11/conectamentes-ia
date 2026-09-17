@@ -55,6 +55,14 @@ public static class RequestEndpoints
             return Results.Ok(item); 
         });
 
+        requests.MapDelete("/{id:guid}", async (Guid id, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db) => {
+            var item = await db.SupportRequests.SingleOrDefaultAsync(x => x.Id == id && x.UserId == ApiIdentity.UserId(p));
+            if (item is null) return Results.NotFound();
+            db.SupportRequests.Remove(item);
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+
         requests.MapPost("/asistente-ia", async ([FromBody] AiSupportRequestPrompt input, [FromServices] IConfiguration config, [FromServices] IHttpClientFactory httpClientFactory) =>
         {
             if (string.IsNullOrWhiteSpace(input.Prompt))
