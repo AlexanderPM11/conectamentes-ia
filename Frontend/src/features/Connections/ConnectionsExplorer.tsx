@@ -6,10 +6,16 @@ import { UserProfileView } from './UserProfileView';
 
 export function ConnectionsExplorer({ matches, requestId, notify, onRequestTopic }: any) {
   const [query, setQuery] = useState('');
-  const [kind, setKind] = useState<'todas' | 'necesito_apoyo'>('todas');
+  const [kind, setKind] = useState<'todas' | 'necesito_apoyo'>(requestId ? 'necesito_apoyo' : 'todas');
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (requestId) {
+      setKind('necesito_apoyo');
+    }
+  }, [requestId]);
 
   useEffect(() => {
     if (kind === 'necesito_apoyo') return;
@@ -37,8 +43,13 @@ export function ConnectionsExplorer({ matches, requestId, notify, onRequestTopic
         }}
         onConnect={async () => {
           try {
-            await api('/api/conexiones/directa/' + selectedUserId, { method: 'POST' });
-            notify('Solicitud de conexión enviada');
+            if (selectedItem?.score !== undefined) {
+              await api('/api/coincidencias/' + selectedItem.id + '/aceptar', { method: 'POST' });
+              notify('Conexión propuesta enviada correctamente.');
+            } else {
+              await api('/api/conexiones/directa/' + selectedUserId, { method: 'POST' });
+              notify('Solicitud de conexión enviada');
+            }
             setResults(results.map(r => r.userId === selectedUserId ? { ...r, hasConnection: true } : r));
             setSelectedUserId(null);
           } catch (error) {
