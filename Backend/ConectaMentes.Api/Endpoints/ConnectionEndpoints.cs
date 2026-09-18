@@ -31,6 +31,7 @@ public static class ConnectionEndpoints
                     topic = x.RequestId != null ? db.SupportRequests.Where(r => r.Id == x.RequestId).Select(r => r.Topic).FirstOrDefault() : "Conexión Directa",
                     counterpartId = x.RequesterId == userId ? x.CollaboratorId : x.RequesterId,
                     counterpart = db.Users.Where(u => u.Id == (x.RequesterId == userId ? x.CollaboratorId : x.RequesterId)).Select(u => u.DisplayName).FirstOrDefault(),
+                    counterpartAvatarUpdatedAt = db.Users.Where(u => u.Id == (x.RequesterId == userId ? x.CollaboratorId : x.RequesterId)).Select(u => u.AvatarUpdatedAt).FirstOrDefault(),
                     requiresMyResponse = x.CollaboratorId == userId && x.Status == ConnectionStatus.PendienteColaborador
                 })
                 .ToListAsync());

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, Fragment, ChangeEvent, FormEvent } from 'react';
 import { API, api } from '../../shared/api/client';
 import { initials } from '../../utils/string';
-import { ScreenIntro, Icon, IsoBadge, EmptyState, ConfirmDialog } from '../../components';
+import { ScreenIntro, Icon, IsoBadge, EmptyState, ConfirmDialog, ProfileAvatar } from '../../components';
 
 const CHAT_FILE_ACCEPT = 'image/jpeg,image/png,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const MAX_CHAT_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -232,7 +232,7 @@ export function Messages({ connections, selectedId, setSelectedId, messagesByCon
                 aria-label={`Abrir conversación con ${item.counterpart}`}
               >
                 <span className={`story-ring story-tone-${index % 4}`}>
-                  <span>{initials(item.counterpart)}</span>
+                  <ProfileAvatar userId={item.counterpartId} name={item.counterpart} version={item.counterpartAvatarUpdatedAt} className="chat-story-avatar" />
                   <i />
                 </span>
                 <small>{(item.counterpart || 'CM').split(' ')[0]}</small>
@@ -259,12 +259,10 @@ export function Messages({ connections, selectedId, setSelectedId, messagesByCon
                     className={`conversation-item ${isSelected ? 'active' : ''}`}
                     onClick={() => { clearFile(); setSelectedId(item.id); }}
                   >
-                    <span className="contact-avatar">
-                      <span className={`contact-avatar-core story-tone-${index % 4}`}>
-                        {initials(item.counterpart)}
+                      <span className="contact-avatar">
+                        <ProfileAvatar userId={item.counterpartId} name={item.counterpart} version={item.counterpartAvatarUpdatedAt} className={`contact-avatar-core story-tone-${index % 4}`} />
+                        <i className={`status-dot ${isItemOnline ? 'online' : 'offline'}`} />
                       </span>
-                      <i className={`status-dot ${isItemOnline ? 'online' : 'offline'}`} />
-                    </span>
                     <span className="contact-copy">
                       <span className="contact-copy-top">
                         <strong>{item.counterpart}</strong>
@@ -298,7 +296,7 @@ export function Messages({ connections, selectedId, setSelectedId, messagesByCon
                 </button>
                 <div className="chat-person">
                   <div className="chat-avatar-wrapper">
-                    <span className="chat-avatar">{initials(current?.counterpart)}</span>
+                    <ProfileAvatar userId={current?.counterpartId} name={current?.counterpart} version={current?.counterpartAvatarUpdatedAt} className="chat-avatar" />
                     <i className={`avatar-status-dot ${isCurrentOnline ? 'online' : 'offline'}`} aria-hidden="true" />
                   </div>
                   <div className="chat-person-details">
