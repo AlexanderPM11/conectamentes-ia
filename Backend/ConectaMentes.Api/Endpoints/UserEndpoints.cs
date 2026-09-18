@@ -33,6 +33,33 @@ public static class UserEndpoints
 
         users.MapGet("/conectados", ([FromServices] IUserTracker tracker) => Results.Ok(tracker.GetOnlineUsers())).RequireAuthorization().WithName("GetOnlineUsers").WithOpenApi();
 
+        users.MapGet("/{id:guid}/perfil", async (Guid id, [FromServices] ConectaMentesDbContext db, CancellationToken ct) =>
+        {
+            var user = await db.Users.SingleOrDefaultAsync(item => item.Id == id, ct);
+            if (user is null) return Results.NotFound();
+
+            var skills = await db.SkillProfiles.Where(s => s.UserId == id && s.Visible).ToListAsync(ct);
+            var availability = await db.Availabilities.SingleOrDefaultAsync(a => a.UserId == id, ct);
+            var badges = await db.Recognitions.Where(r => r.UserId == id).Select(r => r.Type).ToListAsync(ct);
+            
+            var ratings = await db.Ratings.Where(r => r.EvaluatedUserId == id).ToListAsync(ct);
+            var ratingAverage = ratings.Count > 0 
+                ? ratings.Average(r => (r.Usefulness + r.Respect + r.Fulfillment + r.Clarity) / 4.0) 
+                : 0.0;
+
+            return Results.Ok(new {
+                userId = user.Id,
+                displayName = user.DisplayName,
+                career = user.Career,
+                academicTerm = user.AcademicTerm,
+                ratingAverage,
+                totalRatings = ratings.Count,
+                badges,
+                skills,
+                availability
+            });
+        }).RequireAuthorization().WithName("GetUserProfile").WithOpenApi();
+
         return endpoints;
     }
 

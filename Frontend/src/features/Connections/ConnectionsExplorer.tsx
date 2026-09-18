@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { api } from '../../shared/api/client';
 import { initials } from '../../utils/string';
 import { ScreenIntro, Icon, IsoBadge, EmptyState } from '../../components';
+import { UserProfileView } from './UserProfileView';
 
 export function ConnectionsExplorer({ matches, requestId, notify, onRequestTopic }: any) {
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<'todas' | 'necesito_apoyo'>('todas');
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   useEffect(() => {
     if (kind === 'necesito_apoyo') return;
@@ -22,6 +24,31 @@ export function ConnectionsExplorer({ matches, requestId, notify, onRequestTopic
 
   const labelFor = (item: any) => item.type === 'Domina' || item.type === 0 ? 'Puede reforzar conocimientos' : 'Busca apoyo para reforzar';
   
+  if (selectedUserId) {
+    const selectedItem = results.find(r => r.userId === selectedUserId) || matches?.find((m: any) => m.userId === selectedUserId || m.candidateId === selectedUserId);
+    return (
+      <UserProfileView
+        userId={selectedUserId}
+        onBack={() => setSelectedUserId(null)}
+        alreadyConnected={selectedItem?.hasConnection || false}
+        onRequestSupport={(topic) => {
+          setSelectedUserId(null);
+          onRequestTopic(topic);
+        }}
+        onConnect={async () => {
+          try {
+            await api('/api/conexiones/directa/' + selectedUserId, { method: 'POST' });
+            notify('Solicitud de conexión enviada');
+            setResults(results.map(r => r.userId === selectedUserId ? { ...r, hasConnection: true } : r));
+            setSelectedUserId(null);
+          } catch (error) {
+            notify(error instanceof Error ? error.message : 'Error al conectar');
+          }
+        }}
+      />
+    );
+  }
+
   return (
     <section className="screen">
       <ScreenIntro kicker="DESCUBRIR COMUNIDAD" title="Encuentra personas por tema" description="Busca quién puede ayudarte o quién quiere aprender contigo. Explora la comunidad y conecta directamente." badge="network" />
@@ -39,7 +66,7 @@ export function ConnectionsExplorer({ matches, requestId, notify, onRequestTopic
       </section>
       
       {kind === 'necesito_apoyo' ? (
-        <RequestMatches matches={matches} requestId={requestId} notify={notify} />
+        <RequestMatches matches={matches} requestId={requestId} notify={notify} onSelectUser={setSelectedUserId} />
       ) : (
         <>
           <div className="section-heading discovery-heading">
@@ -55,7 +82,7 @@ export function ConnectionsExplorer({ matches, requestId, notify, onRequestTopic
           ) : results.length ? (
             <div className="discovery-grid">
               {results.map(item => (
-                <article className="discovery-card" key={item.id}>
+                <article className="discovery-card clickable-card" key={item.id} onClick={() => setSelectedUserId(item.userId)}>
                   <div className="discovery-card-top">
                     <span className="discovery-avatar">{initials(item.displayName)}</span>
                     <span className={item.type === 'Domina' || item.type === 0 ? 'intent-pill offer' : 'intent-pill need'}>{labelFor(item)}</span>
@@ -68,10 +95,11 @@ export function ConnectionsExplorer({ matches, requestId, notify, onRequestTopic
                       <span className="status-pill">Ya conectados</span>
                     ) : (
                       <div style={{ display: 'flex', gap: '8px' }}>
-                        <button className="button button-secondary small" onClick={() => onRequestTopic(item.topic)}>
+                        <button className="button button-secondary small" onClick={(e) => { e.stopPropagation(); onRequestTopic(item.topic); }}>
                           Solicitar apoyo
                         </button>
-                        <button className="button button-primary small" onClick={async () => {
+                        <button className="button button-primary small" onClick={async (e) => {
+                          e.stopPropagation();
                           try {
                             await api('/api/conexiones/directa/' + item.userId, { method: 'POST' });
                             notify('Solicitud de conexión enviada a ' + item.displayName);
@@ -97,7 +125,7 @@ export function ConnectionsExplorer({ matches, requestId, notify, onRequestTopic
   );
 }
 
-export function RequestMatches({ matches, requestId, notify }: any) {
+export function RequestMatches({ matches, requestId, notify, onSelectUser }: any) {
   async function accept(id: string) { 
     try { 
       await api('/api/coincidencias/' + id + '/aceptar', { method: 'POST' }); 
@@ -130,15 +158,15 @@ export function RequestMatches({ matches, requestId, notify }: any) {
       ) : (
         <div className="match-grid">
           {matches.map((item: any, index: number) => (
-            <article className="match-card" key={item.id}>
+            <article className="match-card clickable-card" key={item.id} onClick={() => onSelectUser(item.candidateId)}>
               <div className="match-avatar">{initials(item.candidate)}<span>{index + 1}</span></div>
               <div className="match-score"><strong>{Math.round(item.score)}%</strong><span>compatible</span></div>
               <h3>{item.candidate}</h3>
               <p>{item.explanation}</p>
               <div className="reason-chips"><span>Tema afín</span><span>Horario compatible</span></div>
               <div className="card-actions">
-                <button className="button button-primary small" onClick={() => accept(item.id)}>Conectar</button>
-                <button className="button button-ghost small" onClick={() => reject(item.id)}>Ahora no</button>
+                <button className="button button-primary small" onClick={(e) => { e.stopPropagation(); accept(item.id); }}>Conectar</button>
+                <button className="button button-ghost small" onClick={(e) => { e.stopPropagation(); reject(item.id); }}>Ahora no</button>
               </div>
             </article>
           ))}
