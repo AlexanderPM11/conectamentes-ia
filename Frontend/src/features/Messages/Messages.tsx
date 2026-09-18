@@ -22,6 +22,7 @@ export function Messages({ connections, selectedId, setSelectedId, messagesByCon
   const [sending, setSending] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState('');
+  const [lightboxAttachment, setLightboxAttachment] = useState<any | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
   const draftInput = useRef<HTMLTextAreaElement>(null);
@@ -317,7 +318,7 @@ export function Messages({ connections, selectedId, setSelectedId, messagesByCon
                       <article className={`message-bubble ${item.isMine ? 'mine' : 'theirs'} ${isSameSenderAsPrev ? 'consecutive' : ''}`}>
                         {item.attachment && (
                           item.attachment.contentType?.startsWith('image/')
-                            ? <ProtectedChatImage attachment={item.attachment} notify={notify} onImageLoaded={() => scrollToBottom('auto')} />
+                            ? <ProtectedChatImage attachment={item.attachment} notify={notify} onImageLoaded={() => scrollToBottom('auto')} onOpen={() => setLightboxAttachment(item.attachment)} />
                             : <button className="document-attachment" onClick={() => openChatAttachment(item.attachment).catch((error: Error) => notify(error.message))}>
                                 <span className="document-icon">DOC</span>
                                 <span>
@@ -440,11 +441,12 @@ export function Messages({ connections, selectedId, setSelectedId, messagesByCon
           </div>
         )}
       </div>
+      {lightboxAttachment && <ChatImageLightbox attachment={lightboxAttachment} notify={notify} onClose={() => setLightboxAttachment(null)} />}
     </section>
   );
 }
 
-export function ProtectedChatImage({ attachment, notify, onImageLoaded }: { attachment: any; notify: (message: string) => void; onImageLoaded?: () => void }) {
+export function ProtectedChatImage({ attachment, notify, onImageLoaded, onOpen }: { attachment: any; notify: (message: string) => void; onImageLoaded?: () => void; onOpen?: () => void }) {
   const [src, setSrc] = useState('');
   useEffect(() => {
     const controller = new AbortController();
@@ -458,7 +460,43 @@ export function ProtectedChatImage({ attachment, notify, onImageLoaded }: { atta
       .catch(error => { if (active && error.name !== 'AbortError') notify('No pudimos cargar una imagen del chat.'); });
     return () => { active = false; controller.abort(); if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [attachment.id, notify]);
-  return <button className="image-attachment" onClick={() => openChatAttachment(attachment).catch((error: Error) => notify(error.message))} aria-label={`Abrir ${attachment.fileName}`}>{src ? <img src={src} alt={attachment.fileName} loading="eager" decoding="async" onLoad={() => onImageLoaded?.()} onError={() => notify('No pudimos visualizar esta imagen.')} /> : <span>Cargando imagen…</span>}</button>;
+  return <button className="image-attachment" onClick={() => src ? onOpen?.() : openChatAttachment(attachment).catch((error: Error) => notify(error.message))} aria-label={`Ver ${attachment.fileName} en pantalla completa`}>{src ? <img src={src} alt={attachment.fileName} loading="eager" decoding="async" onLoad={() => onImageLoaded?.()} onError={() => notify('No pudimos visualizar esta imagen.')} /> : <span>Cargando imagen…</span>}</button>;
+}
+
+function ChatImageLightbox({ attachment, notify, onClose }: { attachment: any; notify: (message: string) => void; onClose: () => void }) {
+  const [src, setSrc] = useState('');
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+    let objectUrl = '';
+    const token = localStorage.getItem('conectamente_token');
+    fetch(`${API}/api/adjuntos/${attachment.id}`, { headers: token ? { Authorization: `Bearer ${token}` } : {}, signal: controller.signal })
+      .then(response => { if (!response.ok) throw new Error(); return response.blob(); })
+      .then(blob => { objectUrl = URL.createObjectURL(blob); if (active) setSrc(objectUrl); })
+      .catch(error => { if (active && error.name !== 'AbortError') notify('No pudimos abrir esta imagen.'); });
+    return () => { active = false; controller.abort(); if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [attachment.id, notify]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="chat-image-lightbox" role="presentation" onMouseDown={event => { if (event.currentTarget === event.target) onClose(); }}>
+      <section className="chat-image-lightbox-panel" role="dialog" aria-modal="true" aria-label={`Vista ampliada de ${attachment.fileName}`}>
+        <div className="chat-image-lightbox-toolbar">
+          <strong>{attachment.fileName}</strong>
+          <button type="button" onClick={onClose} aria-label="Cerrar vista ampliada">×</button>
+        </div>
+        <div className="chat-image-lightbox-content">
+          {src ? <img src={src} alt={attachment.fileName} onError={() => notify('No pudimos visualizar esta imagen.')} /> : <span>Cargando imagen…</span>}
+        </div>
+      </section>
+    </div>
+  );
 }
 
 export function MessageText({ text }: { text: string }) {

@@ -1182,3 +1182,14 @@ body.mobile-chat-open {
   cursor: not-allowed;
   box-shadow: none;
 }
+
+/* Full-screen image viewer for chat attachments. */
+.chat-image-lightbox{position:fixed;z-index:120;inset:0;display:grid;place-items:center;padding:18px;background:rgba(8,25,22,.82);backdrop-filter:blur(10px);animation:chat-lightbox-in .18s ease both}
+.chat-image-lightbox-panel{display:grid;width:min(100%,1100px);height:min(92dvh,900px);grid-template-rows:auto 1fr;overflow:hidden;border:1px solid rgba(255,255,255,.2);border-radius:22px;background:#102b27;box-shadow:0 24px 80px rgba(0,0,0,.38)}
+.chat-image-lightbox-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;color:#f5f1e8;background:rgba(8,25,22,.78);font-size:.78rem}
+.chat-image-lightbox-toolbar strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chat-image-lightbox-toolbar button{display:grid;width:36px;height:36px;flex:0 0 36px;place-items:center;border:1px solid rgba(255,255,255,.18);border-radius:50%;color:#fff;background:rgba(255,255,255,.1);font-size:1.4rem;line-height:1;cursor:pointer}
+.chat-image-lightbox-content{display:grid;min-height:0;place-items:center;padding:16px;overflow:auto}
+.chat-image-lightbox-content img{display:block;max-width:100%;max-height:100%;object-fit:contain;border-radius:12px;box-shadow:0 18px 45px rgba(0,0,0,.28)}
+.chat-image-lightbox-content span{color:#d7e2dc;font-size:.8rem}
+@keyframes chat-lightbox-in{from{opacity:0}to{opacity:1}}
