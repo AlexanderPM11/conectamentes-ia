@@ -84,6 +84,7 @@ export function App() {
       setNotifications(current => current.some(entry => entry.id === item.id) ? current : [item, ...current]);
     });
     realtime.on('ChatMessageReceived', item => setMessagesByConnection(current => ({ ...current, [item.connectionId]: mergeMessage(current[item.connectionId] ?? [], { ...item, isMine: item.senderId === me?.id }) })));
+    realtime.on('ChatMessageDeleted', item => setMessagesByConnection(current => ({ ...current, [item.connectionId]: (current[item.connectionId] ?? []).filter(message => message.id !== item.messageId) })));
     realtime.on('UserPresenceChanged', (userId: string, isOnline: boolean) => {
       setOnlineUsers(current => {
         const next = new Set(current);

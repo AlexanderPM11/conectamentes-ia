@@ -49,6 +49,28 @@ public static class ChatEndpoints
             return Results.Created($"/api/conexiones/{id}/mensajes/{message.Id}", ChatHelpers.ChatMessageView(message, senderName, true, null));
         });
 
+        chat.MapDelete("/mensajes/{messageId:guid}", async (Guid id, Guid messageId, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db, [FromServices] ChatAttachmentStorage storage, [FromServices] IHubContext<RealtimeHub> hub, CancellationToken ct) =>
+        {
+            var userId = ApiIdentity.UserId(p);
+            var message = await (from item in db.ChatMessages
+                                 join connection in db.Connections on item.ConnectionId equals connection.Id
+                                 where item.Id == messageId && item.ConnectionId == id && item.SenderId == userId
+                                       && (connection.RequesterId == userId || connection.CollaboratorId == userId)
+                                 select item).SingleOrDefaultAsync(ct);
+            if (message is null) return Results.NotFound();
+
+            var attachment = await db.ChatAttachments.SingleOrDefaultAsync(item => item.MessageId == messageId, ct);
+            db.ChatMessages.Remove(message);
+            if (attachment is not null) db.ChatAttachments.Remove(attachment);
+            await db.SaveChangesAsync(ct);
+            if (attachment is not null) storage.Delete(attachment.StoredName);
+
+            await hub.Clients.Group(RealtimeHub.UserGroup(userId)).SendAsync("ChatMessageDeleted", new { connectionId = id, messageId }, ct);
+            var otherUserId = await db.Connections.Where(item => item.Id == id).Select(item => item.RequesterId == userId ? item.CollaboratorId : item.RequesterId).SingleAsync(ct);
+            await hub.Clients.Group(RealtimeHub.UserGroup(otherUserId)).SendAsync("ChatMessageDeleted", new { connectionId = id, messageId }, ct);
+            return Results.NoContent();
+        });
+
         chat.MapPost("/adjuntos", async (Guid id, HttpRequest request, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db, [FromServices] ChatAttachmentStorage storage, [FromServices] IHubContext<RealtimeHub> hub, [FromServices] DevicePushService devicePush, CancellationToken ct) =>
         {
             var userId = ApiIdentity.UserId(p);

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, Fragment, ChangeEvent, FormEvent } from 'react';
 import { API, api } from '../../shared/api/client';
 import { initials } from '../../utils/string';
-import { ScreenIntro, Icon, IsoBadge, EmptyState } from '../../components';
+import { ScreenIntro, Icon, IsoBadge, EmptyState, ConfirmDialog } from '../../components';
 
 const CHAT_FILE_ACCEPT = 'image/jpeg,image/png,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const MAX_CHAT_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -23,6 +23,8 @@ export function Messages({ connections, selectedId, setSelectedId, messagesByCon
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [lightboxAttachment, setLightboxAttachment] = useState<any | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<any | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
   const draftInput = useRef<HTMLTextAreaElement>(null);
@@ -151,6 +153,24 @@ export function Messages({ connections, selectedId, setSelectedId, messagesByCon
       notify(error instanceof Error ? error.message : 'No pudimos enviar el mensaje.');
     } finally {
       setSending(false);
+    }
+  }
+
+  async function deleteMessage() {
+    if (!pendingDelete || !currentId || deleting) return;
+    setDeleting(true);
+    try {
+      await api(`/api/conexiones/${currentId}/mensajes/${pendingDelete.id}`, { method: 'DELETE' });
+      setMessagesByConnection((value: any) => ({
+        ...value,
+        [currentId]: (value[currentId] ?? []).filter((message: any) => message.id !== pendingDelete.id)
+      }));
+      notify('Mensaje eliminado.');
+      setPendingDelete(null);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'No pudimos eliminar el mensaje.');
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -316,6 +336,9 @@ export function Messages({ connections, selectedId, setSelectedId, messagesByCon
                         </div>
                       )}
                       <article className={`message-bubble ${item.isMine ? 'mine' : 'theirs'} ${isSameSenderAsPrev ? 'consecutive' : ''}`}>
+                        {item.isMine && (
+                          <button type="button" className="message-delete-button" onClick={() => setPendingDelete(item)} aria-label="Eliminar mensaje" title="Eliminar mensaje">×</button>
+                        )}
                         {item.attachment && (
                           item.attachment.contentType?.startsWith('image/')
                             ? <ProtectedChatImage attachment={item.attachment} notify={notify} onImageLoaded={() => scrollToBottom('auto')} onOpen={() => setLightboxAttachment(item.attachment)} />
@@ -442,6 +465,7 @@ export function Messages({ connections, selectedId, setSelectedId, messagesByCon
         )}
       </div>
       {lightboxAttachment && <ChatImageLightbox attachment={lightboxAttachment} notify={notify} onClose={() => setLightboxAttachment(null)} />}
+      {pendingDelete && <ConfirmDialog title="¿Eliminar este mensaje?" message="Se quitará este mensaje y cualquier archivo adjunto de la conversación. Esta acción no se puede deshacer." confirmLabel={deleting ? 'Eliminando…' : 'Eliminar mensaje'} onConfirm={deleteMessage} onCancel={() => { if (!deleting) setPendingDelete(null); }} />}
     </section>
   );
 }
