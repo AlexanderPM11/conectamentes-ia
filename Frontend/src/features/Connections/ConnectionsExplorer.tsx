@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../shared/api/client';
 import { initials } from '../../utils/string';
-import { ScreenIntro, Icon, IsoBadge, EmptyState } from '../../components';
+import { ScreenIntro, Icon, IsoBadge, EmptyState, ProfileAvatar } from '../../components';
 import { UserProfileView } from './UserProfileView';
 
 export function ConnectionsExplorer({ matches, requestId, notify, onRequestTopic }: any) {
@@ -84,7 +84,7 @@ export function ConnectionsExplorer({ matches, requestId, notify, onRequestTopic
               {results.map(item => (
                 <article className="discovery-card clickable-card" key={item.id} onClick={() => setSelectedUserId(item.userId)}>
                   <div className="discovery-card-top">
-                    <span className="discovery-avatar">{initials(item.displayName)}</span>
+                    <ProfileAvatar userId={item.userId} name={item.displayName} className="discovery-avatar" />
                     <span className={item.type === 'Domina' || item.type === 0 ? 'intent-pill offer' : 'intent-pill need'}>{labelFor(item)}</span>
                   </div>
                   <h3>{item.topic}</h3>
@@ -94,23 +94,18 @@ export function ConnectionsExplorer({ matches, requestId, notify, onRequestTopic
                     {item.hasConnection ? (
                       <span className="status-pill">Ya conectados</span>
                     ) : (
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button className="button button-secondary small" onClick={(e) => { e.stopPropagation(); onRequestTopic(item.topic); }}>
-                          Solicitar apoyo
-                        </button>
-                        <button className="button button-primary small" onClick={async (e) => {
-                          e.stopPropagation();
-                          try {
-                            await api('/api/conexiones/directa/' + item.userId, { method: 'POST' });
-                            notify('Solicitud de conexión enviada a ' + item.displayName);
-                            setResults(results.map(r => r.userId === item.userId ? { ...r, hasConnection: true } : r));
-                          } catch (error) {
-                            notify(error instanceof Error ? error.message : 'Error al conectar');
-                          }
-                        }}>
-                          Conectar
-                        </button>
-                      </div>
+                      <button className="button button-primary small" onClick={async (e) => {
+                        e.stopPropagation();
+                        try {
+                          await api('/api/conexiones/directa/' + item.userId, { method: 'POST' });
+                          notify('Solicitud de conexión enviada a ' + item.displayName);
+                          setResults(results.map(r => r.userId === item.userId ? { ...r, hasConnection: true } : r));
+                        } catch (error) {
+                          notify(error instanceof Error ? error.message : 'Error al conectar');
+                        }
+                      }}>
+                        Conectar
+                      </button>
                     )}
                   </div>
                 </article>
@@ -159,7 +154,10 @@ export function RequestMatches({ matches, requestId, notify, onSelectUser }: any
         <div className="match-grid">
           {matches.map((item: any, index: number) => (
             <article className="match-card clickable-card" key={item.id} onClick={() => onSelectUser(item.candidateId)}>
-              <div className="match-avatar">{initials(item.candidate)}<span>{index + 1}</span></div>
+              <div className="match-avatar-container">
+                <ProfileAvatar userId={item.candidateId} name={item.candidate} className="match-avatar" />
+                <span className="match-rank">{index + 1}</span>
+              </div>
               <div className="match-score"><strong>{Math.round(item.score)}%</strong><span>compatible</span></div>
               <h3>{item.candidate}</h3>
               <p>{item.explanation}</p>

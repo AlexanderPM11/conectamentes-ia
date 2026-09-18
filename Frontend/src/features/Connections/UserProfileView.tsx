@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../shared/api/client';
 import { initials } from '../../utils/string';
-import { Icon, StarDisplay } from '../../components';
+import { Icon, StarDisplay, ProfileAvatar } from '../../components';
 
 interface UserProfileViewProps {
   userId: string;
@@ -67,7 +67,7 @@ export function UserProfileView({ userId, onBack, onConnect, onRequestSupport, a
 
       <div className="surface-card user-profile-header">
         <div className="profile-header-top">
-          <div className="avatar-large">{initials(profile.displayName)}</div>
+          <ProfileAvatar userId={profile.userId} name={profile.displayName} className="avatar-large" />
           <div className="profile-titles">
             <h2>{profile.displayName}</h2>
             <p>{profile.career}</p>
