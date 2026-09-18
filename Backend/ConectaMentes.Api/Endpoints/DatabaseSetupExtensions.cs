@@ -88,6 +88,8 @@ public static class DatabaseSetupExtensions
         await EnsureColumnAsync(db, "Users", "AccessStatusChangedAt");
         await EnsureColumnAsync(db, "Users", "AvatarPath");
         await EnsureColumnAsync(db, "Users", "AvatarUpdatedAt");
+        await EnsureNullableColumnAsync(db, "Connections", "RequestId");
+        await EnsureNullableColumnAsync(db, "Connections", "MatchId");
         await EnsureIndexAsync(db, "Ratings", "UX_Ratings_SessionId_AuthorId", "CREATE UNIQUE INDEX `UX_Ratings_SessionId_AuthorId` ON `Ratings` (`SessionId`, `AuthorId`);");
         
         var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
@@ -145,6 +147,26 @@ public static class DatabaseSetupExtensions
         var indexParameter = check.CreateParameter(); indexParameter.ParameterName = "@index"; indexParameter.Value = indexName; check.Parameters.Add(indexParameter);
         if (Convert.ToInt32(await check.ExecuteScalarAsync()) > 0) return;
         if (tableName != "Ratings" || indexName != "UX_Ratings_SessionId_AuthorId") throw new InvalidOperationException("Índice no permitido.");
+        await db.Database.ExecuteSqlRawAsync(statement);
+    }
+
+    private static async Task EnsureNullableColumnAsync(ConectaMentesDbContext db, string tableName, string columnName)
+    {
+        var connection = db.Database.GetDbConnection();
+        if (connection.State != System.Data.ConnectionState.Open) await connection.OpenAsync();
+        await using var check = connection.CreateCommand();
+        check.CommandText = "SELECT IS_NULLABLE FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = @table AND column_name = @column";
+        var tableParameter = check.CreateParameter(); tableParameter.ParameterName = "@table"; tableParameter.Value = tableName; check.Parameters.Add(tableParameter);
+        var columnParameter = check.CreateParameter(); columnParameter.ParameterName = "@column"; columnParameter.Value = columnName; check.Parameters.Add(columnParameter);
+        var nullable = Convert.ToString(await check.ExecuteScalarAsync());
+        if (nullable is null || string.Equals(nullable, "YES", StringComparison.OrdinalIgnoreCase)) return;
+
+        var statement = (tableName, columnName) switch
+        {
+            ("Connections", "RequestId") => "ALTER TABLE `Connections` MODIFY COLUMN `RequestId` char(36) CHARACTER SET ascii COLLATE ascii_general_ci NULL;",
+            ("Connections", "MatchId") => "ALTER TABLE `Connections` MODIFY COLUMN `MatchId` char(36) CHARACTER SET ascii COLLATE ascii_general_ci NULL;",
+            _ => throw new InvalidOperationException("Cambio de esquema no permitido.")
+        };
         await db.Database.ExecuteSqlRawAsync(statement);
     }
 }
