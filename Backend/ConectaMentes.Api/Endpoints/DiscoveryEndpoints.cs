@@ -20,9 +20,15 @@ public static class DiscoveryEndpoints
             var blocked = await db.Blocks.Where(x => x.UserId == userId || x.BlockedUserId == userId).Select(x => x.UserId == userId ? x.BlockedUserId : x.UserId).ToListAsync();
             var normalizedTopic = topic?.Trim().ToLower();
             var normalizedType = type?.Trim();
+            var requestedType = normalizedType switch
+            {
+                "Domina" => SkillType.Domina,
+                "NecesitaApoyo" => SkillType.NecesitaApoyo,
+                _ => (SkillType?)null
+            };
             var query = from user in db.Users
                         where user.Id != userId && !blocked.Contains(user.Id) && !user.Roles.Contains("admin")
-                        let topSkill = db.SkillProfiles.Where(s => s.UserId == user.Id && s.Visible).OrderByDescending(s => s.Confidence).FirstOrDefault()
+                        let topSkill = db.SkillProfiles.Where(s => s.UserId == user.Id && s.Visible && (requestedType == null || s.Type == requestedType)).OrderByDescending(s => s.Confidence).FirstOrDefault()
                         select new
                         {
                             Id = topSkill != null ? topSkill.Id : Guid.NewGuid(),
@@ -35,7 +41,6 @@ public static class DiscoveryEndpoints
                             hasConnection = db.Connections.Any(connection => connection.Status != ConnectionStatus.Rechazada && ((connection.RequesterId == userId && connection.CollaboratorId == user.Id) || (connection.CollaboratorId == userId && connection.RequesterId == user.Id)))
                         };
             if (!string.IsNullOrWhiteSpace(normalizedTopic)) query = query.Where(item => item.Topic.ToLower().Contains(normalizedTopic) || item.DisplayName.ToLower().Contains(normalizedTopic));
-            if (normalizedType is "Domina" or "NecesitaApoyo") query = query.Where(item => item.Type == Enum.Parse<SkillType>(normalizedType));
             return Results.Ok(await query.OrderByDescending(item => item.Confidence).ThenBy(item => item.DisplayName).Take(60).ToListAsync());
         }).RequireAuthorization().WithTags("Descubrimiento");
 

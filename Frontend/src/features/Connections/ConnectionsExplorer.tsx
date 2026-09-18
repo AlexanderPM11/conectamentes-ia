@@ -18,10 +18,10 @@ export function ConnectionsExplorer({ matches, requestId, notify, onRequestTopic
   }, [requestId]);
 
   useEffect(() => {
-    if (kind === 'necesito_apoyo') return;
     let cancelled = false;
     setLoading(true);
-    const timer = window.setTimeout(() => api(`/api/descubrimiento?topic=${encodeURIComponent(query)}&type=`)
+    const type = kind === 'necesito_apoyo' ? 'NecesitaApoyo' : '';
+    const timer = window.setTimeout(() => api(`/api/descubrimiento?topic=${encodeURIComponent(kind === 'todas' ? query : '')}&type=${type}`)
       .then(items => { if (!cancelled) setResults(items); })
       .catch(error => { if (!cancelled) notify(error instanceof Error ? error.message : 'No pudimos buscar en la comunidad.'); })
       .finally(() => { if (!cancelled) setLoading(false); }), 220);
@@ -76,58 +76,64 @@ export function ConnectionsExplorer({ matches, requestId, notify, onRequestTopic
         </div>
       </section>
       
-      {kind === 'necesito_apoyo' ? (
+      {kind === 'necesito_apoyo' && requestId && matches?.length ? (
         <RequestMatches matches={matches} requestId={requestId} notify={notify} onSelectUser={setSelectedUserId} />
       ) : (
-        <>
-          <div className="section-heading discovery-heading">
-            <div>
-              <p className="eyebrow">RESULTADOS ABIERTOS</p>
-              <h2>{loading ? 'Buscando personas…' : `${results.length} perfiles encontrados`}</h2>
-            </div>
-            <IsoBadge kind="chat" />
-          </div>
-          
-          {loading ? (
-            <div className="discovery-loading"><span /><span /><span /></div>
-          ) : results.length ? (
-            <div className="discovery-grid">
-              {results.map(item => (
-                <article className="discovery-card clickable-card" key={item.id} onClick={() => setSelectedUserId(item.userId)}>
-                  <div className="discovery-card-top">
-                    <ProfileAvatar userId={item.userId} name={item.displayName} className="discovery-avatar" />
-                    <span className={item.type === 'Domina' || item.type === 0 ? 'intent-pill offer' : 'intent-pill need'}>{labelFor(item)}</span>
-                  </div>
-                  <h3>{item.topic}</h3>
-                  <p className="discovery-person">{item.displayName} <span>·</span> {item.career || 'Comunidad ConectaMentes'}</p>
-                  <div className="discovery-meta">
-                    <span>Confianza {item.confidence}/5</span>
-                    {item.hasConnection ? (
-                      <span className="status-pill">Ya conectados</span>
-                    ) : (
-                      <button className="button button-primary small" onClick={async (e) => {
-                        e.stopPropagation();
-                        try {
-                          await api('/api/conexiones/directa/' + item.userId, { method: 'POST' });
-                          notify('Solicitud de conexión enviada a ' + item.displayName);
-                          setResults(results.map(r => r.userId === item.userId ? { ...r, hasConnection: true } : r));
-                        } catch (error) {
-                          notify(error instanceof Error ? error.message : 'Error al conectar');
-                        }
-                      }}>
-                        Conectar
-                      </button>
-                    )}
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <EmptyState title="No encontramos ese tema todavía" text="Prueba con otra palabra o publica una solicitud para que la comunidad pueda encontrarte." badge="network" />
-          )}
-        </>
+        <DiscoveryResults results={results} loading={loading} labelFor={labelFor} notify={notify} onSelectUser={setSelectedUserId} setResults={setResults} emptyTitle={kind === 'necesito_apoyo' ? 'No encontramos personas que necesiten apoyo' : 'No encontramos ese tema todavía'} emptyText={kind === 'necesito_apoyo' ? 'Cuando alguien agregue un tema en el que busca apoyo, aparecerá aquí.' : 'Prueba con otra palabra o publica una solicitud para que la comunidad pueda encontrarte.'} />
       )}
     </section>
+  );
+}
+
+function DiscoveryResults({ results, loading, labelFor, notify, onSelectUser, setResults, emptyTitle, emptyText }: any) {
+  return (
+    <>
+      <div className="section-heading discovery-heading">
+        <div>
+          <p className="eyebrow">RESULTADOS ABIERTOS</p>
+          <h2>{loading ? 'Buscando personas…' : `${results.length} perfiles encontrados`}</h2>
+        </div>
+        <IsoBadge kind="chat" />
+      </div>
+
+      {loading ? (
+        <div className="discovery-loading"><span /><span /><span /></div>
+      ) : results.length ? (
+        <div className="discovery-grid">
+          {results.map((item: any) => (
+            <article className="discovery-card clickable-card" key={item.id} onClick={() => onSelectUser(item.userId)}>
+              <div className="discovery-card-top">
+                <ProfileAvatar userId={item.userId} name={item.displayName} className="discovery-avatar" />
+                <span className={item.type === 'Domina' || item.type === 0 ? 'intent-pill offer' : 'intent-pill need'}>{labelFor(item)}</span>
+              </div>
+              <h3>{item.topic}</h3>
+              <p className="discovery-person">{item.displayName} <span>·</span> {item.career || 'Comunidad ConectaMentes'}</p>
+              <div className="discovery-meta">
+                <span>Confianza {item.confidence}/5</span>
+                {item.hasConnection ? (
+                  <span className="status-pill">Ya conectados</span>
+                ) : (
+                  <button className="button button-primary small" onClick={async (e) => {
+                    e.stopPropagation();
+                    try {
+                      await api('/api/conexiones/directa/' + item.userId, { method: 'POST' });
+                      notify('Solicitud de conexión enviada a ' + item.displayName);
+                      setResults((current: any[]) => current.map(r => r.userId === item.userId ? { ...r, hasConnection: true } : r));
+                    } catch (error) {
+                      notify(error instanceof Error ? error.message : 'Error al conectar');
+                    }
+                  }}>
+                    Conectar
+                  </button>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <EmptyState title={emptyTitle} text={emptyText} badge="network" />
+      )}
+    </>
   );
 }
 
