@@ -5,6 +5,7 @@ import { ScreenIntro, Icon, IsoBadge, EmptyState } from '../../components';
 
 const CHAT_FILE_ACCEPT = 'image/jpeg,image/png,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const MAX_CHAT_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
 
 function mergeMessage(list: any[], newItem: any) { const i = list.findIndex(m => m.id === newItem.id); if (i >= 0) { const copy = [...list]; copy[i] = newItem; return copy; } return [...list, newItem]; }
 function dominicanDateKey(isoDate: string) { return new Date(isoDate).toLocaleDateString('es-DO', { timeZone: 'America/Santo_Domingo', year: 'numeric', month: '2-digit', day: '2-digit' }); }
@@ -12,6 +13,7 @@ function formatChatDayDivider(isoDate: string) { const d = new Date(isoDate); co
 function formatDominicanTime(isoDate: string) { return new Date(isoDate).toLocaleTimeString('es-DO', { timeZone: 'America/Santo_Domingo', hour: 'numeric', minute: '2-digit', hour12: true }); }
 function formatRelative(isoDate: string) { const now = new Date(); const d = new Date(isoDate); const diffMin = Math.floor((now.getTime() - d.getTime()) / 60000); if (diffMin < 1) return 'ahora'; if (diffMin < 60) return `${diffMin} min`; const diffHrs = Math.floor(diffMin / 60); if (diffHrs < 24) return `${diffHrs} h`; const diffDays = Math.floor(diffHrs / 24); if (diffDays < 7) return `${diffDays} d`; return d.toLocaleDateString('es-DO'); }
 function formatFileSize(bytes: number) { if (bytes < 1024) return bytes + ' B'; if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'; return (bytes / 1048576).toFixed(1) + ' MB'; }
+function isImageFile(file: File) { return file.type.startsWith('image/') || IMAGE_EXTENSIONS.some(extension => file.name.toLowerCase().endsWith(extension)); }
 async function openChatAttachment(attachment: any) { const token = localStorage.getItem('conectamente_token'); const response = await fetch(`${API}/api/adjuntos/${attachment.id}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} }); if (!response.ok) throw new Error('El archivo no está disponible.'); const blob = await response.blob(); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = attachment.fileName; a.click(); setTimeout(() => URL.revokeObjectURL(url), 5000); }
 
 export function Messages({ connections, selectedId, setSelectedId, messagesByConnection, setMessagesByConnection, realtimeConnected, notify, navigate, onlineUsers }: any) {
@@ -123,7 +125,7 @@ export function Messages({ connections, selectedId, setSelectedId, messagesByCon
     }
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setSelectedFile(file);
-    setPreviewUrl(file.type.startsWith('image/') ? URL.createObjectURL(file) : '');
+    setPreviewUrl(isImageFile(file) ? URL.createObjectURL(file) : '');
   }
 
   async function send(event: FormEvent) {
@@ -444,8 +446,19 @@ export function Messages({ connections, selectedId, setSelectedId, messagesByCon
 
 export function ProtectedChatImage({ attachment, notify, onImageLoaded }: { attachment: any; notify: (message: string) => void; onImageLoaded?: () => void }) {
   const [src, setSrc] = useState('');
-  useEffect(() => { let active = true; let objectUrl = ''; const token = localStorage.getItem('conectamente_token'); fetch(`${API}/api/adjuntos/${attachment.id}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} }).then(response => { if (!response.ok) throw new Error(); return response.blob(); }).then(blob => { objectUrl = URL.createObjectURL(blob); if (active) setSrc(objectUrl); }).catch(() => active && notify('No pudimos cargar una imagen del chat.')); return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl); }; }, [attachment.id]);
-  return <button className="image-attachment" onClick={() => openChatAttachment(attachment).catch((error: Error) => notify(error.message))} aria-label={`Abrir ${attachment.fileName}`}>{src ? <img src={src} alt={attachment.fileName} loading="lazy" onLoad={() => onImageLoaded?.()} /> : <span>Cargando imagen…</span>}</button>;
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+    let objectUrl = '';
+    setSrc('');
+    const token = localStorage.getItem('conectamente_token');
+    fetch(`${API}/api/adjuntos/${attachment.id}`, { headers: token ? { Authorization: `Bearer ${token}` } : {}, signal: controller.signal })
+      .then(response => { if (!response.ok) throw new Error(); return response.blob(); })
+      .then(blob => { objectUrl = URL.createObjectURL(blob); if (active) setSrc(objectUrl); })
+      .catch(error => { if (active && error.name !== 'AbortError') notify('No pudimos cargar una imagen del chat.'); });
+    return () => { active = false; controller.abort(); if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [attachment.id, notify]);
+  return <button className="image-attachment" onClick={() => openChatAttachment(attachment).catch((error: Error) => notify(error.message))} aria-label={`Abrir ${attachment.fileName}`}>{src ? <img src={src} alt={attachment.fileName} loading="eager" decoding="async" onLoad={() => onImageLoaded?.()} onError={() => notify('No pudimos visualizar esta imagen.')} /> : <span>Cargando imagen…</span>}</button>;
 }
 
 export function MessageText({ text }: { text: string }) {
