@@ -20,8 +20,10 @@ export function ConnectionsExplorer({ matches, requestId, notify, onRequestTopic
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    const type = kind === 'necesito_apoyo' ? 'NecesitaApoyo' : '';
-    const timer = window.setTimeout(() => api(`/api/descubrimiento?topic=${encodeURIComponent(kind === 'todas' ? query : '')}&type=${type}`)
+    const path = kind === 'necesito_apoyo'
+      ? '/api/descubrimiento/necesito-apoyo'
+      : `/api/descubrimiento?topic=${encodeURIComponent(query)}&type=`;
+    const timer = window.setTimeout(() => api(path)
       .then(items => { if (!cancelled) setResults(items); })
       .catch(error => { if (!cancelled) notify(error instanceof Error ? error.message : 'No pudimos buscar en la comunidad.'); })
       .finally(() => { if (!cancelled) setLoading(false); }), 220);
@@ -76,11 +78,7 @@ export function ConnectionsExplorer({ matches, requestId, notify, onRequestTopic
         </div>
       </section>
       
-      {kind === 'necesito_apoyo' && requestId && matches?.length ? (
-        <RequestMatches matches={matches} requestId={requestId} notify={notify} onSelectUser={setSelectedUserId} />
-      ) : (
-        <DiscoveryResults results={results} loading={loading} labelFor={labelFor} notify={notify} onSelectUser={setSelectedUserId} setResults={setResults} emptyTitle={kind === 'necesito_apoyo' ? 'No encontramos personas que necesiten apoyo' : 'No encontramos ese tema todavía'} emptyText={kind === 'necesito_apoyo' ? 'Cuando alguien agregue un tema en el que busca apoyo, aparecerá aquí.' : 'Prueba con otra palabra o publica una solicitud para que la comunidad pueda encontrarte.'} />
-      )}
+      <DiscoveryResults results={results} loading={loading} labelFor={labelFor} notify={notify} onSelectUser={setSelectedUserId} setResults={setResults} emptyTitle={kind === 'necesito_apoyo' ? 'No encontramos personas para tus solicitudes' : 'No encontramos ese tema todavía'} emptyText={kind === 'necesito_apoyo' ? 'Agrega un tema o una descripción más específica en tus solicitudes para encontrar personas que lo dominen.' : 'Prueba con otra palabra o publica una solicitud para que la comunidad pueda encontrarte.'} />
     </section>
   );
 }
