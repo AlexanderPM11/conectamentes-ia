@@ -20,19 +20,19 @@ public static class DiscoveryEndpoints
             var blocked = await db.Blocks.Where(x => x.UserId == userId || x.BlockedUserId == userId).Select(x => x.UserId == userId ? x.BlockedUserId : x.UserId).ToListAsync();
             var normalizedTopic = topic?.Trim().ToLower();
             var normalizedType = type?.Trim();
-            var query = from skill in db.SkillProfiles
-                        join user in db.Users on skill.UserId equals user.Id
-                        where skill.UserId != userId && skill.Visible && !blocked.Contains(skill.UserId) && !user.Roles.Contains("admin")
+            var query = from user in db.Users
+                        where user.Id != userId && !blocked.Contains(user.Id) && !user.Roles.Contains("admin")
+                        let topSkill = db.SkillProfiles.Where(s => s.UserId == user.Id && s.Visible).OrderByDescending(s => s.Confidence).FirstOrDefault()
                         select new
                         {
-                            skill.Id,
-                            skill.UserId,
-                            skill.Topic,
-                            skill.Type,
-                            skill.Confidence,
-                            user.DisplayName,
-                            user.Career,
-                            hasConnection = db.Connections.Any(connection => connection.Status != ConnectionStatus.Rechazada && (connection.RequesterId == userId && connection.CollaboratorId == skill.UserId || connection.CollaboratorId == userId && connection.RequesterId == skill.UserId))
+                            Id = topSkill != null ? topSkill.Id : Guid.NewGuid(),
+                            UserId = user.Id,
+                            Topic = topSkill != null ? topSkill.Topic : "Estudiante de " + user.Career,
+                            Type = topSkill != null ? topSkill.Type : SkillType.Domina,
+                            Confidence = topSkill != null ? topSkill.Confidence : 3,
+                            DisplayName = user.DisplayName,
+                            Career = user.Career,
+                            hasConnection = db.Connections.Any(connection => connection.Status != ConnectionStatus.Rechazada && ((connection.RequesterId == userId && connection.CollaboratorId == user.Id) || (connection.CollaboratorId == userId && connection.RequesterId == user.Id)))
                         };
             if (!string.IsNullOrWhiteSpace(normalizedTopic)) query = query.Where(item => item.Topic.ToLower().Contains(normalizedTopic) || item.DisplayName.ToLower().Contains(normalizedTopic));
             if (normalizedType is "Domina" or "NecesitaApoyo") query = query.Where(item => item.Type == Enum.Parse<SkillType>(normalizedType));

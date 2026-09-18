@@ -5,14 +5,15 @@ import { ScreenIntro, Icon, IsoBadge, EmptyState } from '../../components';
 
 export function ConnectionsExplorer({ matches, requestId, notify, onRequestTopic }: any) {
   const [query, setQuery] = useState('');
-  const [kind, setKind] = useState('todos');
+  const [kind, setKind] = useState<'todas' | 'necesito_apoyo'>('todas');
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (kind === 'necesito_apoyo') return;
     let cancelled = false;
     setLoading(true);
-    const timer = window.setTimeout(() => api(`/api/descubrimiento?topic=${encodeURIComponent(query)}&type=${kind === 'todos' ? '' : kind}`)
+    const timer = window.setTimeout(() => api(`/api/descubrimiento?topic=${encodeURIComponent(query)}&type=`)
       .then(items => { if (!cancelled) setResults(items); })
       .catch(error => { if (!cancelled) notify(error instanceof Error ? error.message : 'No pudimos buscar en la comunidad.'); })
       .finally(() => { if (!cancelled) setLoading(false); }), 220);
@@ -25,67 +26,72 @@ export function ConnectionsExplorer({ matches, requestId, notify, onRequestTopic
     <section className="screen">
       <ScreenIntro kicker="DESCUBRIR COMUNIDAD" title="Encuentra personas por tema" description="Busca quién puede ayudarte o quién quiere aprender contigo. Explora la comunidad y conecta directamente." badge="network" />
       <section className="discovery-search surface-card">
-        <div className="search-field">
-          <Icon name="search" />
-          <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Busca un tema, una materia o una persona…" aria-label="Buscar en la comunidad" />
-        </div>
+        {kind === 'todas' && (
+          <div className="search-field">
+            <Icon name="search" />
+            <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Busca un tema, una materia o una persona…" aria-label="Buscar en la comunidad" />
+          </div>
+        )}
         <div className="discovery-filters" role="group" aria-label="Filtrar por intención">
-          <button className={kind === 'todos' ? 'filter-chip active' : 'filter-chip'} onClick={() => setKind('todos')}>Todas las personas</button>
-          <button className={kind === 'Domina' ? 'filter-chip active' : 'filter-chip'} onClick={() => setKind('Domina')}><span className="filter-dot offer" />Puede ayudar</button>
-          <button className={kind === 'NecesitaApoyo' ? 'filter-chip active' : 'filter-chip'} onClick={() => setKind('NecesitaApoyo')}><span className="filter-dot need" />Necesita apoyo</button>
+          <button className={kind === 'todas' ? 'filter-chip active' : 'filter-chip'} onClick={() => setKind('todas')}>Todas las personas</button>
+          <button className={kind === 'necesito_apoyo' ? 'filter-chip active' : 'filter-chip'} onClick={() => setKind('necesito_apoyo')}><span className="filter-dot need" />Necesito apoyo</button>
         </div>
       </section>
       
-      {requestId && matches.length > 0 && <RequestMatches matches={matches} requestId={requestId} notify={notify} /> }
-      
-      <div className="section-heading discovery-heading">
-        <div>
-          <p className="eyebrow">RESULTADOS ABIERTOS</p>
-          <h2>{loading ? 'Buscando personas…' : `${results.length} perfiles encontrados`}</h2>
-        </div>
-        <IsoBadge kind="chat" />
-      </div>
-      
-      {loading ? (
-        <div className="discovery-loading"><span /><span /><span /></div>
-      ) : results.length ? (
-        <div className="discovery-grid">
-          {results.map(item => (
-            <article className="discovery-card" key={item.id}>
-              <div className="discovery-card-top">
-                <span className="discovery-avatar">{initials(item.displayName)}</span>
-                <span className={item.type === 'Domina' || item.type === 0 ? 'intent-pill offer' : 'intent-pill need'}>{labelFor(item)}</span>
-              </div>
-              <h3>{item.topic}</h3>
-              <p className="discovery-person">{item.displayName} <span>·</span> {item.career || 'Comunidad ConectaMentes'}</p>
-              <div className="discovery-meta">
-                <span>Confianza {item.confidence}/5</span>
-                {item.hasConnection ? (
-                  <span className="status-pill">Ya conectados</span>
-                ) : (
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button className="button button-secondary small" onClick={() => onRequestTopic(item.topic)}>
-                      Solicitar apoyo
-                    </button>
-                    <button className="button button-primary small" onClick={async () => {
-                      try {
-                        await api('/api/conexiones/directa/' + item.userId, { method: 'POST' });
-                        notify('Solicitud de conexión enviada a ' + item.displayName);
-                        setResults(results.map(r => r.userId === item.userId ? { ...r, hasConnection: true } : r));
-                      } catch (error) {
-                        notify(error instanceof Error ? error.message : 'Error al conectar');
-                      }
-                    }}>
-                      Conectar
-                    </button>
-                  </div>
-                )}
-              </div>
-            </article>
-          ))}
-        </div>
+      {kind === 'necesito_apoyo' ? (
+        <RequestMatches matches={matches} requestId={requestId} notify={notify} />
       ) : (
-        <EmptyState title="No encontramos ese tema todavía" text="Prueba con otra palabra o publica una solicitud para que la comunidad pueda encontrarte." badge="network" />
+        <>
+          <div className="section-heading discovery-heading">
+            <div>
+              <p className="eyebrow">RESULTADOS ABIERTOS</p>
+              <h2>{loading ? 'Buscando personas…' : `${results.length} perfiles encontrados`}</h2>
+            </div>
+            <IsoBadge kind="chat" />
+          </div>
+          
+          {loading ? (
+            <div className="discovery-loading"><span /><span /><span /></div>
+          ) : results.length ? (
+            <div className="discovery-grid">
+              {results.map(item => (
+                <article className="discovery-card" key={item.id}>
+                  <div className="discovery-card-top">
+                    <span className="discovery-avatar">{initials(item.displayName)}</span>
+                    <span className={item.type === 'Domina' || item.type === 0 ? 'intent-pill offer' : 'intent-pill need'}>{labelFor(item)}</span>
+                  </div>
+                  <h3>{item.topic}</h3>
+                  <p className="discovery-person">{item.displayName} <span>·</span> {item.career || 'Comunidad ConectaMentes'}</p>
+                  <div className="discovery-meta">
+                    <span>Confianza {item.confidence}/5</span>
+                    {item.hasConnection ? (
+                      <span className="status-pill">Ya conectados</span>
+                    ) : (
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button className="button button-secondary small" onClick={() => onRequestTopic(item.topic)}>
+                          Solicitar apoyo
+                        </button>
+                        <button className="button button-primary small" onClick={async () => {
+                          try {
+                            await api('/api/conexiones/directa/' + item.userId, { method: 'POST' });
+                            notify('Solicitud de conexión enviada a ' + item.displayName);
+                            setResults(results.map(r => r.userId === item.userId ? { ...r, hasConnection: true } : r));
+                          } catch (error) {
+                            notify(error instanceof Error ? error.message : 'Error al conectar');
+                          }
+                        }}>
+                          Conectar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <EmptyState title="No encontramos ese tema todavía" text="Prueba con otra palabra o publica una solicitud para que la comunidad pueda encontrarte." badge="network" />
+          )}
+        </>
       )}
     </section>
   );
@@ -111,10 +117,16 @@ export function RequestMatches({ matches, requestId, notify }: any) {
   }
   
   return (
-    <section className="screen">
-      <ScreenIntro kicker="SUGERENCIAS" title="Personas sugeridas para ti" description="Basado en tu solicitud, estas personas dominan el tema y pueden apoyarte." badge="network" />
+    <>
+      <div className="section-heading discovery-heading">
+        <div>
+          <p className="eyebrow">SUGERENCIAS</p>
+          <h2>Personas sugeridas para ti</h2>
+        </div>
+        <IsoBadge kind="network" />
+      </div>
       {!requestId || matches.length === 0 ? (
-        <EmptyState title="Todavía no hay conexiones sugeridas" text="Publica una solicitud y selecciona “Buscar compañeros” para ver recomendaciones." badge="network" />
+        <EmptyState title="Todavía no hay conexiones sugeridas" text="Publica una solicitud en la pestaña de Solicitudes para ver personas compatibles aquí." badge="network" />
       ) : (
         <div className="match-grid">
           {matches.map((item: any, index: number) => (
@@ -132,6 +144,6 @@ export function RequestMatches({ matches, requestId, notify }: any) {
           ))}
         </div>
       )}
-    </section>
+    </>
   );
 }
