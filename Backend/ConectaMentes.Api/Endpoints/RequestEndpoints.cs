@@ -302,7 +302,3 @@ public static class RequestEndpoints
         return (topic, $"Me gustaría comprender mejor esto: {clean}");
     }
 }
-
-public record SupportRequestInput(string Topic, string Description, string HelpType, string DesiredSchedule);
-public record AiSupportRequestSuggestion(string Topic, string Description);
-public record CommentInput(string Text);
