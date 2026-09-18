@@ -8,12 +8,18 @@ export function Requests({ requests, form, setForm, submit, calculate, editingRe
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'mis-solicitudes' | 'comunidad'>('mis-solicitudes');
   const [communityRequests, setCommunityRequests] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedComments, setExpandedComments] = useState<Record<string, any[] | null>>({});
+  const [commentInput, setCommentInput] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (activeTab === 'comunidad') {
-      api('/api/solicitudes/comunidad').then(setCommunityRequests).catch(err => notify(err instanceof Error ? err.message : 'Error al cargar comunidad.'));
+      const timer = window.setTimeout(() => {
+        api(`/api/solicitudes/comunidad?q=${encodeURIComponent(searchQuery)}`).then(setCommunityRequests).catch(err => notify(err instanceof Error ? err.message : 'Error al cargar comunidad.'));
+      }, 300);
+      return () => window.clearTimeout(timer);
     }
-  }, [activeTab]);
+  }, [activeTab, searchQuery]);
 
   async function offerHelp(requestId: string) {
     try {
@@ -21,6 +27,37 @@ export function Requests({ requests, form, setForm, submit, calculate, editingRe
       notify('Ayuda ofrecida. Se ha notificado al solicitante.');
     } catch (error) {
       notify(error instanceof Error ? error.message : 'No se pudo ofrecer ayuda.');
+    }
+  }
+
+  async function toggleComments(requestId: string) {
+    if (expandedComments[requestId] !== undefined) {
+      const copy = { ...expandedComments };
+      delete copy[requestId];
+      setExpandedComments(copy);
+    } else {
+      setExpandedComments({ ...expandedComments, [requestId]: null }); // loading
+      try {
+        const data = await api(`/api/solicitudes/${requestId}/comentarios`);
+        setExpandedComments(prev => ({ ...prev, [requestId]: data }));
+      } catch (err) {
+        notify('Error al cargar comentarios.');
+        setExpandedComments(prev => { const c = { ...prev }; delete c[requestId]; return c; });
+      }
+    }
+  }
+
+  async function submitComment(e: FormEvent, requestId: string) {
+    e.preventDefault();
+    const text = commentInput[requestId]?.trim();
+    if (!text) return;
+    try {
+      const res = await api(`/api/solicitudes/${requestId}/comentarios`, { method: 'POST', body: JSON.stringify({ text }) });
+      setExpandedComments(prev => ({ ...prev, [requestId]: [...(prev[requestId] || []), res] }));
+      setCommentInput(prev => ({ ...prev, [requestId]: '' }));
+      setCommunityRequests(prev => prev.map(r => r.id === requestId ? { ...r, commentCount: (r.commentCount || 0) + 1 } : r));
+    } catch (err) {
+      notify(err instanceof Error ? err.message : 'Error al enviar comentario.');
     }
   }
 
@@ -144,6 +181,12 @@ export function Requests({ requests, form, setForm, submit, calculate, editingRe
               <h2>Solicitudes de la comunidad</h2>
             </div>
           </div>
+          <div className="discovery-search surface-card" style={{ marginBottom: '24px' }}>
+            <div className="search-field">
+              <Icon name="search" />
+              <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Busca por tema o palabra clave..." aria-label="Buscar solicitudes" />
+            </div>
+          </div>
           <div className="request-list">
             {communityRequests.length ? (
               communityRequests.map((item: any) => (
@@ -154,14 +197,39 @@ export function Requests({ requests, form, setForm, submit, calculate, editingRe
                   </div>
                   <h3>{item.topic}</h3>
                   <p>{item.description}</p>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '8px' }}>
-                    Publicado por <strong>{item.authorName}</strong> · {item.authorCareer}
+                  <p className="request-author-meta">
+                    Publicado por <strong>{item.authorName}</strong> {item.authorBadge && <span className="request-badge">{item.authorBadge}</span>} · {item.authorCareer}
                   </p>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '16px' }}>
+                  <div className="request-card-actions">
                     <button type="button" className="button button-primary small" onClick={() => offerHelp(item.id)}>
                       Ofrecer ayuda <span>→</span>
                     </button>
+                    <button type="button" className="button button-ghost small" onClick={() => toggleComments(item.id)}>
+                      Comentarios ({item.commentCount || 0})
+                    </button>
                   </div>
+                  {expandedComments[item.id] !== undefined && (
+                    <div className="comments-section">
+                      {expandedComments[item.id] === null ? (
+                        <p className="comments-loading">Cargando...</p>
+                      ) : expandedComments[item.id]!.length === 0 ? (
+                        <p className="comments-empty">Aún no hay comentarios. Sé el primero.</p>
+                      ) : (
+                        <div className="comments-list">
+                          {expandedComments[item.id]!.map(c => (
+                            <div key={c.id} className="comment-item">
+                              <span className="comment-author">{c.authorName}</span>
+                              <p className="comment-text">{c.text}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <form onSubmit={e => submitComment(e, item.id)} className="comment-form">
+                        <input value={commentInput[item.id] || ''} onChange={e => setCommentInput(prev => ({ ...prev, [item.id]: e.target.value }))} placeholder="Escribe un comentario..." required className="comment-input" />
+                        <button type="submit" className="button button-secondary small">Enviar</button>
+                      </form>
+                    </div>
+                  )}
                 </article>
               ))
             ) : (

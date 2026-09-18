@@ -34,7 +34,7 @@ public static class RequestEndpoints
 
         requests.MapGet("/mias", async (ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db) => Results.Ok(await db.SupportRequests.Where(x => x.UserId == ApiIdentity.UserId(p)).OrderByDescending(x => x.CreatedAt).ToListAsync()));
 
-        requests.MapGet("/comunidad", async (ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db) => {
+        requests.MapGet("/comunidad", async ([FromQuery] string? q, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db) => {
             var userId = ApiIdentity.UserId(p);
             var blocked = await db.Blocks.Where(x => x.UserId == userId || x.BlockedUserId == userId).Select(x => x.UserId == userId ? x.BlockedUserId : x.UserId).ToListAsync();
             var query = from req in db.SupportRequests
@@ -51,8 +51,17 @@ public static class RequestEndpoints
                             req.CreatedAt,
                             authorId = user.Id,
                             authorName = user.DisplayName,
-                            authorCareer = user.Career
+                            authorCareer = user.Career,
+                            authorBadge = db.Recognitions.Where(r => r.UserId == user.Id).Select(r => r.Type).FirstOrDefault(),
+                            commentCount = db.SupportRequestComments.Count(c => c.RequestId == req.Id)
                         };
+            
+            if (!string.IsNullOrWhiteSpace(q))
+            {
+                var search = q.Trim().ToLower();
+                query = query.Where(x => x.Topic.ToLower().Contains(search) || x.Description.ToLower().Contains(search));
+            }
+            
             return Results.Ok(await query.Take(50).ToListAsync());
         });
 
@@ -243,6 +252,43 @@ public static class RequestEndpoints
             return Results.Ok(new AiSupportRequestSuggestion(suggestedTopic, suggestedDescription));
         });
 
+        requests.MapGet("/{id:guid}/comentarios", async (Guid id, [FromServices] ConectaMentesDbContext db) => {
+            var comments = await (from c in db.SupportRequestComments
+                                  join u in db.Users on c.AuthorId equals u.Id
+                                  where c.RequestId == id
+                                  orderby c.CreatedAt ascending
+                                  select new {
+                                      c.Id,
+                                      c.Text,
+                                      c.CreatedAt,
+                                      authorId = u.Id,
+                                      authorName = u.DisplayName
+                                  }).ToListAsync();
+            return Results.Ok(comments);
+        });
+
+        requests.MapPost("/{id:guid}/comentarios", async (Guid id, [FromBody] CommentInput input, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db, [FromServices] IHubContext<RealtimeHub> hub, [FromServices] DevicePushService devicePush) => {
+            if (string.IsNullOrWhiteSpace(input.Text)) return Results.BadRequest("El comentario no puede estar vacío.");
+            var userId = ApiIdentity.UserId(p);
+            var request = await db.SupportRequests.SingleOrDefaultAsync(x => x.Id == id);
+            if (request is null) return Results.NotFound();
+            
+            var comment = new SupportRequestComment { RequestId = id, AuthorId = userId, Text = input.Text.Trim() };
+            db.SupportRequestComments.Add(comment);
+            
+            if (request.UserId != userId) {
+                var authorName = await db.Users.Where(u => u.Id == userId).Select(u => u.DisplayName).FirstOrDefaultAsync();
+                var notification = NotificationHelpers.NewNotification(request.UserId, "comment", "Nuevo comentario", $"{authorName} comentó en tu solicitud: '{comment.Text}'", request.Id);
+                db.Notifications.Add(notification);
+                await db.SaveChangesAsync();
+                await NotificationHelpers.PushNotification(notification, hub, devicePush);
+            } else {
+                await db.SaveChangesAsync();
+            }
+            
+            return Results.Ok(comment);
+        });
+
         return endpoints;
     }
 
@@ -256,3 +302,7 @@ public static class RequestEndpoints
         return (topic, $"Me gustaría comprender mejor esto: {clean}");
     }
 }
+
+public record SupportRequestInput(string Topic, string Description, string HelpType, string DesiredSchedule);
+public record AiSupportRequestSuggestion(string Topic, string Description);
+public record CommentInput(string Text);

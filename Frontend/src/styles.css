@@ -331,3 +331,105 @@
   color: var(--muted);
   font-weight: 500;
 }
+
+/* === Social Features & Feed === */
+.feed-tabs {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.request-author-meta {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.request-author-meta strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.request-badge {
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  background: var(--surface-hover);
+  color: var(--brand);
+  border: 1px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+}
+
+.request-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+/* Comments Section */
+.comments-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  font-size: 0.875rem;
+  animation: fade-in 0.3s ease-out;
+}
+
+.comments-loading,
+.comments-empty {
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.comment-item {
+  background: var(--surface);
+  padding: 12px;
+  border-radius: 8px;
+}
+
+.comment-author {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--text);
+}
+
+.comment-text {
+  margin: 0;
+  color: var(--muted);
+}
+
+.comment-form {
+  display: flex;
+  gap: 8px;
+}
+
+.comment-input {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-hover);
+  color: var(--text);
+  transition: all 0.2s ease;
+}
+
+.comment-input:focus {
+  outline: none;
+  border-color: var(--brand);
+  background: var(--surface);
+}

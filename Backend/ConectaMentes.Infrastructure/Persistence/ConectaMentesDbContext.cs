@@ -9,6 +9,7 @@ public sealed class ConectaMentesDbContext(DbContextOptions<ConectaMentesDbConte
     public DbSet<SkillProfile> SkillProfiles => Set<SkillProfile>();
     public DbSet<Availability> Availabilities => Set<Availability>();
     public DbSet<SupportRequest> SupportRequests => Set<SupportRequest>();
+    public DbSet<SupportRequestComment> SupportRequestComments => Set<SupportRequestComment>();
     public DbSet<Match> Matches => Set<Match>();
     public DbSet<Connection> Connections => Set<Connection>();
     public DbSet<LearningSession> Sessions => Set<LearningSession>();

@@ -17,6 +17,17 @@ public static class DatabaseSetupExtensions
         await db.Database.EnsureCreatedAsync();
 
         await db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS `SupportRequestComments` (
+              `Id` char(36) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,
+              `RequestId` char(36) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,
+              `AuthorId` char(36) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,
+              `Text` varchar(1500) NOT NULL,
+              `CreatedAt` datetime(6) NOT NULL,
+              PRIMARY KEY (`Id`), INDEX `IX_SupportRequestComments_RequestId_CreatedAt` (`RequestId`,`CreatedAt`)
+            );
+            """);
+
+        await db.Database.ExecuteSqlRawAsync("""
             CREATE TABLE IF NOT EXISTS `Notifications` (
               `Id` char(36) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,
               `UserId` char(36) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,
