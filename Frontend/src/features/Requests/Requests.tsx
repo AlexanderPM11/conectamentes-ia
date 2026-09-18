@@ -4,8 +4,25 @@ import { ScreenIntro, CardHeading, IsoBadge, Icon, EmptyState, ConfirmDialog } f
 
 function humanStatus(status: unknown) { return String(status ?? 'abierta').replaceAll('_', ' ').replace(/^./, value => value.toUpperCase()); }
 
-export function Requests({ requests, form, setForm, submit, calculate, editingRequest, setEditingRequest, deleteRequest }: any) {
+export function Requests({ requests, form, setForm, submit, calculate, editingRequest, setEditingRequest, deleteRequest, notify }: any) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'mis-solicitudes' | 'comunidad'>('mis-solicitudes');
+  const [communityRequests, setCommunityRequests] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (activeTab === 'comunidad') {
+      api('/api/solicitudes/comunidad').then(setCommunityRequests).catch(err => notify(err instanceof Error ? err.message : 'Error al cargar comunidad.'));
+    }
+  }, [activeTab]);
+
+  async function offerHelp(requestId: string) {
+    try {
+      await api('/api/conexiones/ofrecer-apoyo/' + requestId, { method: 'POST' });
+      notify('Ayuda ofrecida. Se ha notificado al solicitante.');
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'No se pudo ofrecer ayuda.');
+    }
+  }
 
   function handleEditClick(item: any) {
     setForm({ topic: item.topic, description: item.description, helpType: item.helpType || 'comprender', desiredSchedule: item.desiredSchedule || '' });
@@ -20,6 +37,12 @@ export function Requests({ requests, form, setForm, submit, calculate, editingRe
         description="Publica tu duda de forma sencilla o usa el botón flotante con IA para redactarla en segundos."
         badge="chat"
       />
+      <div className="discovery-filters" style={{ marginBottom: '24px', display: 'flex', gap: '8px' }}>
+        <button className={activeTab === 'mis-solicitudes' ? 'filter-chip active' : 'filter-chip'} onClick={() => setActiveTab('mis-solicitudes')}>Mis Solicitudes</button>
+        <button className={activeTab === 'comunidad' ? 'filter-chip active' : 'filter-chip'} onClick={() => setActiveTab('comunidad')}>Feed de la Comunidad</button>
+      </div>
+
+      {activeTab === 'mis-solicitudes' && (
       <div className="content-grid requests-grid">
         <form className="surface-card form-surface simplified-request-form" onSubmit={submit}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -111,6 +134,46 @@ export function Requests({ requests, form, setForm, submit, calculate, editingRe
           </div>
         </section>
       </div>
+      )}
+
+      {activeTab === 'comunidad' && (
+        <section>
+          <div className="section-heading compact">
+            <div>
+              <p className="eyebrow">EXPLORAR</p>
+              <h2>Solicitudes de la comunidad</h2>
+            </div>
+          </div>
+          <div className="request-list">
+            {communityRequests.length ? (
+              communityRequests.map((item: any) => (
+                <article className="request-card" key={item.id}>
+                  <div className="request-top">
+                    <IsoBadge kind="chat" />
+                    <span className="status-pill">{humanStatus(item.status)}</span>
+                  </div>
+                  <h3>{item.topic}</h3>
+                  <p>{item.description}</p>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '8px' }}>
+                    Publicado por <strong>{item.authorName}</strong> · {item.authorCareer}
+                  </p>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '16px' }}>
+                    <button type="button" className="button button-primary small" onClick={() => offerHelp(item.id)}>
+                      Ofrecer ayuda <span>→</span>
+                    </button>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <EmptyState
+                title="No hay solicitudes activas"
+                text="La comunidad no tiene solicitudes abiertas en este momento."
+                badge="chat"
+              />
+            )}
+          </div>
+        </section>
+      )}
       {deletingId && (
         <ConfirmDialog
           title="Eliminar solicitud"

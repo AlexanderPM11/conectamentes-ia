@@ -23,7 +23,8 @@ public static class MatchEndpoints
             if (request is null) return Results.NotFound(); 
             var topic = request.Topic.ToLower(); 
             var blocked = await db.Blocks.Where(x => x.UserId == ApiIdentity.UserId(p)).Select(x => x.BlockedUserId).ToListAsync(); 
-            var candidates = await db.SkillProfiles.Where(x => x.Type == SkillType.Domina && x.UserId != ApiIdentity.UserId(p) && !blocked.Contains(x.UserId) && x.Topic.ToLower() == topic).ToListAsync(); 
+            var adminIds = await db.Users.Where(u => u.Roles.Contains("admin")).Select(u => u.Id).ToListAsync();
+            var candidates = await db.SkillProfiles.Where(x => x.Type == SkillType.Domina && x.UserId != ApiIdentity.UserId(p) && !blocked.Contains(x.UserId) && !adminIds.Contains(x.UserId) && x.Topic.ToLower() == topic).ToListAsync(); 
             var old = db.Matches.Where(x => x.RequestId == requestId); 
             db.RemoveRange(old); 
             foreach (var candidate in candidates.Take(10)) 

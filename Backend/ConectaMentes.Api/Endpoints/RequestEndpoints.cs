@@ -34,6 +34,28 @@ public static class RequestEndpoints
 
         requests.MapGet("/mias", async (ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db) => Results.Ok(await db.SupportRequests.Where(x => x.UserId == ApiIdentity.UserId(p)).OrderByDescending(x => x.CreatedAt).ToListAsync()));
 
+        requests.MapGet("/comunidad", async (ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db) => {
+            var userId = ApiIdentity.UserId(p);
+            var blocked = await db.Blocks.Where(x => x.UserId == userId || x.BlockedUserId == userId).Select(x => x.UserId == userId ? x.BlockedUserId : x.UserId).ToListAsync();
+            var query = from req in db.SupportRequests
+                        join user in db.Users on req.UserId equals user.Id
+                        where req.UserId != userId && !blocked.Contains(req.UserId) && !user.Roles.Contains("admin") && (req.Status == RequestStatus.Abierta || req.Status == RequestStatus.ConCoincidencias)
+                        orderby req.CreatedAt descending
+                        select new {
+                            req.Id,
+                            req.Topic,
+                            req.Description,
+                            req.HelpType,
+                            req.DesiredSchedule,
+                            req.Status,
+                            req.CreatedAt,
+                            authorId = user.Id,
+                            authorName = user.DisplayName,
+                            authorCareer = user.Career
+                        };
+            return Results.Ok(await query.Take(50).ToListAsync());
+        });
+
         requests.MapGet("/{id:guid}", async (Guid id, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db) => await db.SupportRequests.SingleOrDefaultAsync(x => x.Id == id && x.UserId == ApiIdentity.UserId(p)) is { } item ? Results.Ok(item) : Results.NotFound());
 
         requests.MapPut("/{id:guid}", async (Guid id, [FromBody] SupportRequestInput input, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db) => {

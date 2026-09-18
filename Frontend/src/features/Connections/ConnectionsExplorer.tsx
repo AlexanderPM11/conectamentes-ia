@@ -23,7 +23,7 @@ export function ConnectionsExplorer({ matches, requestId, notify, onRequestTopic
   
   return (
     <section className="screen">
-      <ScreenIntro kicker="DESCUBRIR COMUNIDAD" title="Encuentra personas por tema" description="Busca quién puede ayudarte o quién quiere aprender contigo. Solo aparecen temas que cada persona decidió compartir." badge="network" />
+      <ScreenIntro kicker="DESCUBRIR COMUNIDAD" title="Encuentra personas por tema" description="Busca quién puede ayudarte o quién quiere aprender contigo. Explora la comunidad y conecta directamente." badge="network" />
       <section className="discovery-search surface-card">
         <div className="search-field">
           <Icon name="search" />
@@ -63,9 +63,22 @@ export function ConnectionsExplorer({ matches, requestId, notify, onRequestTopic
                 {item.hasConnection ? (
                   <span className="status-pill">Ya conectados</span>
                 ) : (
-                  <button className="button button-secondary small" onClick={() => onRequestTopic(item.topic)}>
-                    Aprender sobre este tema <span>→</span>
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button className="button button-secondary small" onClick={() => onRequestTopic(item.topic)}>
+                      Solicitar apoyo
+                    </button>
+                    <button className="button button-primary small" onClick={async () => {
+                      try {
+                        await api('/api/conexiones/directa/' + item.userId, { method: 'POST' });
+                        notify('Solicitud de conexión enviada a ' + item.displayName);
+                        setResults(results.map(r => r.userId === item.userId ? { ...r, hasConnection: true } : r));
+                      } catch (error) {
+                        notify(error instanceof Error ? error.message : 'Error al conectar');
+                      }
+                    }}>
+                      Conectar
+                    </button>
+                  </div>
                 )}
               </div>
             </article>
@@ -99,7 +112,7 @@ export function RequestMatches({ matches, requestId, notify }: any) {
   
   return (
     <section className="screen">
-      <ScreenIntro kicker="COMPATIBILIDAD EXPLICABLE" title="Personas que pueden ayudarte" description="Cada recomendación incluye una razón clara. Tú decides con quién conectar." badge="network" />
+      <ScreenIntro kicker="SUGERENCIAS" title="Personas sugeridas para ti" description="Basado en tu solicitud, estas personas dominan el tema y pueden apoyarte." badge="network" />
       {!requestId || matches.length === 0 ? (
         <EmptyState title="Todavía no hay conexiones sugeridas" text="Publica una solicitud y selecciona “Buscar compañeros” para ver recomendaciones." badge="network" />
       ) : (

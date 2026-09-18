@@ -28,12 +28,49 @@ public static class ConnectionEndpoints
                     x.Id,
                     x.RequestId,
                     x.Status,
-                    topic = db.SupportRequests.Where(r => r.Id == x.RequestId).Select(r => r.Topic).FirstOrDefault(),
+                    topic = x.RequestId != null ? db.SupportRequests.Where(r => r.Id == x.RequestId).Select(r => r.Topic).FirstOrDefault() : "Conexión Directa",
                     counterpartId = x.RequesterId == userId ? x.CollaboratorId : x.RequesterId,
                     counterpart = db.Users.Where(u => u.Id == (x.RequesterId == userId ? x.CollaboratorId : x.RequesterId)).Select(u => u.DisplayName).FirstOrDefault(),
                     requiresMyResponse = x.CollaboratorId == userId && x.Status == ConnectionStatus.PendienteColaborador
                 })
                 .ToListAsync());
+        });
+
+        connections.MapPost("/ofrecer-apoyo/{requestId:guid}", async (Guid requestId, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db, [FromServices] IHubContext<RealtimeHub> hub, [FromServices] DevicePushService devicePush) => {
+            var userId = ApiIdentity.UserId(p);
+            var request = await db.SupportRequests.SingleOrDefaultAsync(x => x.Id == requestId);
+            if (request is null) return Results.NotFound();
+            if (request.UserId == userId) return Results.BadRequest("No puedes ofrecer apoyo a tu propia solicitud.");
+            var existing = await db.Connections.SingleOrDefaultAsync(x => x.RequestId == requestId && x.RequesterId == request.UserId && x.CollaboratorId == userId);
+            if (existing is not null) return Results.Ok(existing);
+            
+            var connection = new Connection { RequestId = requestId, RequesterId = request.UserId, CollaboratorId = userId, Status = ConnectionStatus.PendienteColaborador };
+            var collaboratorName = await db.Users.Where(x => x.Id == userId).Select(x => x.DisplayName).SingleAsync();
+            var notification = NotificationHelpers.NewNotification(request.UserId, "connection_request", "Alguien ofreció ayudarte", $"{collaboratorName} ofreció apoyo para tu solicitud de {request.Topic}.", connection.Id);
+            
+            db.AddRange(connection, notification);
+            await db.SaveChangesAsync();
+            await NotificationHelpers.PushNotification(notification, hub, devicePush);
+            return Results.Ok(connection);
+        });
+
+        connections.MapPost("/directa/{targetUserId:guid}", async (Guid targetUserId, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db, [FromServices] IHubContext<RealtimeHub> hub, [FromServices] DevicePushService devicePush) => {
+            var userId = ApiIdentity.UserId(p);
+            if (userId == targetUserId) return Results.BadRequest("No puedes conectar contigo mismo.");
+            var target = await db.Users.SingleOrDefaultAsync(x => x.Id == targetUserId);
+            if (target is null) return Results.NotFound();
+            
+            var existing = await db.Connections.SingleOrDefaultAsync(x => x.RequestId == null && ((x.RequesterId == userId && x.CollaboratorId == targetUserId) || (x.RequesterId == targetUserId && x.CollaboratorId == userId)));
+            if (existing is not null) return Results.Ok(existing);
+            
+            var connection = new Connection { RequestId = null, RequesterId = userId, CollaboratorId = targetUserId, Status = ConnectionStatus.PendienteColaborador };
+            var requesterName = await db.Users.Where(x => x.Id == userId).Select(x => x.DisplayName).SingleAsync();
+            var notification = NotificationHelpers.NewNotification(targetUserId, "connection_request", "Nueva solicitud de conexión", $"{requesterName} quiere conectar contigo para aprender juntos.", connection.Id);
+            
+            db.AddRange(connection, notification);
+            await db.SaveChangesAsync();
+            await NotificationHelpers.PushNotification(notification, hub, devicePush);
+            return Results.Ok(connection);
         });
 
         connections.MapGet("/{id:guid}/solicitante", async (Guid id, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db, CancellationToken ct) =>
@@ -42,8 +79,8 @@ public static class ConnectionEndpoints
             var connection = await db.Connections.SingleOrDefaultAsync(item => item.Id == id && item.CollaboratorId == userId && item.Status == ConnectionStatus.PendienteColaborador, ct);
             if (connection is null) return Results.NotFound();
             var requester = await db.Users.SingleOrDefaultAsync(item => item.Id == connection.RequesterId, ct);
-            var request = await db.SupportRequests.SingleOrDefaultAsync(item => item.Id == connection.RequestId, ct);
-            if (requester is null || request is null) return Results.NotFound();
+            var request = connection.RequestId != null ? await db.SupportRequests.SingleOrDefaultAsync(item => item.Id == connection.RequestId, ct) : null;
+            if (requester is null) return Results.NotFound();
             var skills = await db.SkillProfiles.Where(item => item.UserId == requester.Id && item.Visible).OrderByDescending(item => item.Confidence).Take(12).Select(item => new { item.Topic, item.Type, item.Confidence }).ToListAsync(ct);
             var availability = await db.Availabilities.Where(item => item.UserId == requester.Id).Select(item => new { item.TimeSlots, item.PreferredMode }).SingleOrDefaultAsync(ct);
             var ratingRows = await db.Ratings.Where(item => item.EvaluatedUserId == requester.Id).Select(item => new { item.Usefulness, item.Clarity, item.Fulfillment, item.Respect }).ToListAsync(ct);
@@ -51,7 +88,7 @@ public static class ConnectionEndpoints
             return Results.Ok(new
             {
                 connectionId = connection.Id,
-                request = new { request.Topic, request.Description, request.HelpType, request.DesiredSchedule, request.CreatedAt },
+                request = request != null ? new { request.Topic, request.Description, request.HelpType, request.DesiredSchedule, request.CreatedAt } : null,
                 person = new { requester.Id, requester.DisplayName, requester.Career, requester.AcademicTerm, requester.CreatedAt, requester.AvatarUpdatedAt },
                 skills,
                 availability,
@@ -66,8 +103,8 @@ public static class ConnectionEndpoints
             if (item is null) return Results.NotFound();
             item.Status = input.Accept ? ConnectionStatus.Activa : ConnectionStatus.Rechazada;
             var collaboratorName = await db.Users.Where(x => x.Id == userId).Select(x => x.DisplayName).SingleAsync();
-            var topic = await db.SupportRequests.Where(x => x.Id == item.RequestId).Select(x => x.Topic).SingleAsync();
-            var notification = NotificationHelpers.NewNotification(item.RequesterId, input.Accept ? "connection_accepted" : "connection_rejected", input.Accept ? "Conexión aceptada" : "Solicitud no aceptada", input.Accept ? $"{collaboratorName} aceptó ayudarte con {topic}. Ya pueden conversar." : $"{collaboratorName} no pudo aceptar la conexión sobre {topic}.", item.Id);
+            var topic = item.RequestId != null ? await db.SupportRequests.Where(x => x.Id == item.RequestId).Select(x => x.Topic).FirstOrDefaultAsync() : "aprender juntos";
+            var notification = NotificationHelpers.NewNotification(item.RequesterId, input.Accept ? "connection_accepted" : "connection_rejected", input.Accept ? "Conexión aceptada" : "Solicitud no aceptada", input.Accept ? $"{collaboratorName} aceptó conectar contigo sobre {topic}. Ya pueden conversar." : $"{collaboratorName} no pudo aceptar la conexión sobre {topic}.", item.Id);
             db.Add(notification);
             await db.SaveChangesAsync();
             await NotificationHelpers.PushNotification(notification, hub, devicePush);

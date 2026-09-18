@@ -22,7 +22,7 @@ public static class DiscoveryEndpoints
             var normalizedType = type?.Trim();
             var query = from skill in db.SkillProfiles
                         join user in db.Users on skill.UserId equals user.Id
-                        where skill.UserId != userId && skill.Visible && !blocked.Contains(skill.UserId)
+                        where skill.UserId != userId && skill.Visible && !blocked.Contains(skill.UserId) && !user.Roles.Contains("admin")
                         select new
                         {
                             skill.Id,
