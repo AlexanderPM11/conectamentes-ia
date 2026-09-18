@@ -293,17 +293,6 @@ export function Messages({ connections, selectedId, setSelectedId, messagesByCon
                 <span className="safe-chat" title="Espacio seguro y monitoreado">
                   <Icon name="shield" /> <span>espacio cuidado</span>
                 </span>
-                {navigate && (
-                  <button
-                    type="button"
-                    className="chat-quick-agenda-btn"
-                    onClick={() => navigate('agenda')}
-                    title="Coordinar o revisar sesiones de estudio"
-                  >
-                    <Icon name="calendar" />
-                    <span>Agendar</span>
-                  </button>
-                )}
               </div>
             </header>
 

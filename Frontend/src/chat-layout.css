@@ -707,32 +707,6 @@ body.mobile-chat-open {
   flex-shrink: 0;
 }
 
-.chat-quick-agenda-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 11px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: #ffffff;
-  color: var(--forest);
-  font-size: 0.72rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 0.16s, transform 0.16s;
-}
-
-.chat-quick-agenda-btn:hover {
-  background: var(--sage);
-  transform: translateY(-1px);
-}
-
-.chat-quick-agenda-btn svg {
-  width: 15px;
-  height: 15px;
-  color: var(--clay);
-}
-
 @media (max-width: 520px) {
   .safe-chat span {
     display: none;
@@ -743,13 +717,6 @@ body.mobile-chat-open {
   .safe-chat svg {
     width: 16px;
     height: 16px;
-  }
-  .chat-quick-agenda-btn span {
-    display: none;
-  }
-  .chat-quick-agenda-btn {
-    padding: 7px;
-    border-radius: 50%;
   }
 }
 
