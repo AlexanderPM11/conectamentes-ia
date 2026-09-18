@@ -61,11 +61,12 @@ export function UserProfileView({ userId, onBack, onConnect, onRequestSupport, a
 
   return (
     <section className="screen profile-dedicated-view">
-      <button className="button button-ghost" onClick={onBack} style={{ alignSelf: 'flex-start', marginBottom: '16px' }}>
+      <button className="profile-back-button" onClick={onBack}>
         <span>←</span> Volver a resultados
       </button>
 
       <div className="surface-card user-profile-header">
+        <p className="profile-header-kicker">PERFIL DE LA COMUNIDAD</p>
         <div className="profile-header-top">
           <ProfileAvatar userId={profile.userId} name={profile.displayName} className="avatar-large" />
           <div className="profile-titles">
@@ -91,8 +92,11 @@ export function UserProfileView({ userId, onBack, onConnect, onRequestSupport, a
         </div>
       </div>
 
-      <div className="profile-skills-section">
-        <h3>Temas que domina</h3>
+      <div className="profile-skills-section profile-skills-offer">
+        <div className="profile-section-heading">
+          <span className="profile-section-marker">01</span>
+          <div><p>LO QUE COMPARTE</p><h3>Temas que domina</h3></div>
+        </div>
         {domina.length > 0 ? (
           <div className="skills-grid">
             {domina.map((s: any) => (
@@ -110,8 +114,11 @@ export function UserProfileView({ userId, onBack, onConnect, onRequestSupport, a
         )}
       </div>
 
-      <div className="profile-skills-section">
-        <h3>Temas en los que busca apoyo</h3>
+      <div className="profile-skills-section profile-skills-need">
+        <div className="profile-section-heading">
+          <span className="profile-section-marker">02</span>
+          <div><p>LO QUE ESTÁ EXPLORANDO</p><h3>Temas en los que busca apoyo</h3></div>
+        </div>
         {necesita.length > 0 ? (
           <div className="skills-grid">
             {necesita.map((s: any) => (
