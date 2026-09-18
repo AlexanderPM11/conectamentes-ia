@@ -80,6 +80,7 @@ public sealed class ConectaMentesDbContext(DbContextOptions<ConectaMentesDbConte
         modelBuilder.Entity<Rating>(entity =>
         {
             entity.HasIndex(item => new { item.SessionId, item.AuthorId }).IsUnique();
+            entity.HasIndex(item => new { item.ConnectionId, item.AuthorId }).IsUnique();
             entity.HasIndex(item => new { item.EvaluatedUserId, item.CreatedAt });
             entity.Property(item => item.Comment).HasMaxLength(500);
         });

@@ -11,7 +11,6 @@ import { Requests, AiRequestDialog } from './features/Requests/Requests';
 import { ConnectionsExplorer } from './features/Connections/ConnectionsExplorer';
 import { Messages } from './features/Messages/Messages';
 import { Ranking } from './features/Ranking/Ranking';
-import { Agenda } from './features/Agenda/Agenda';
 import { Security } from './features/Security/Security';
 import { InstitutionalPanel } from './features/Institutional/InstitutionalPanel';
 import { AdminPanel } from './features/Admin/AdminPanel';
@@ -27,7 +26,6 @@ const navItems: { id: Tab; label: string; icon: IconName }[] = [
   { id: 'mensajes', label: 'Mensajes', icon: 'message' },
   { id: 'ranking', label: 'Ranking', icon: 'star' },
   { id: 'perfil', label: 'Mi perfil', icon: 'profile' },
-  { id: 'agenda', label: 'Agenda', icon: 'calendar' },
   { id: 'seguridad', label: 'Seguridad', icon: 'shield' },
   { id: 'panel', label: 'Panel', icon: 'chart' },
   { id: 'admin', label: 'Administración', icon: 'shield' }
@@ -46,7 +44,6 @@ export function App() {
   const [requests, setRequests] = useState<any[]>([]);
   const [matches, setMatches] = useState<any[]>([]);
   const [connections, setConnections] = useState<any[]>([]);
-  const [sessions, setSessions] = useState<any[]>([]);
   const [selectedRequest, setSelectedRequest] = useState('');
   const [profile, setProfile] = useState<any>({ habilidades: [], disponibilidad: null });
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -70,14 +67,13 @@ export function App() {
     api('/api/perfil').then(setProfile).catch(showError); 
     api('/api/solicitudes/mias').then(setRequests).catch(showError); 
     api('/api/conexiones').then(setConnections).catch(showError); 
-    api('/api/sesiones').then(setSessions).catch(showError); 
     api('/api/notificaciones').then(setNotifications).catch(showError); 
   }, [logged]);
   
   useEffect(() => { 
     if (logged && tab === 'perfil') api('/api/perfil').then(setProfile).catch(showError); 
     if (logged && tab === 'solicitudes') api('/api/solicitudes/mias').then(setRequests).catch(showError); 
-    if (logged && (tab === 'agenda' || tab === 'seguridad')) Promise.all([api('/api/conexiones'), api('/api/sesiones')]).then(([currentConnections, currentSessions]) => { setConnections(currentConnections); setSessions(currentSessions); }).catch(showError); 
+    if (logged && tab === 'seguridad') api('/api/conexiones').then(setConnections).catch(showError);
   }, [logged, tab]);
   
   useEffect(() => {
@@ -217,10 +213,7 @@ export function App() {
       if (next === 'perfil') setProfile(await api('/api/perfil')); 
       if (next === 'solicitudes') setRequests(await api('/api/solicitudes/mias')); 
       if (next === 'mensajes') setConnections(await api('/api/conexiones')); 
-      if (next === 'agenda' || next === 'seguridad') { 
-        const [currentConnections, currentSessions] = await Promise.all([api('/api/conexiones'), api('/api/sesiones')]); 
-        setConnections(currentConnections); setSessions(currentSessions); 
-      } 
+      if (next === 'seguridad') setConnections(await api('/api/conexiones'));
     } catch (error) { showError(error); } 
   }
   
@@ -238,13 +231,14 @@ export function App() {
     if (item.referenceId && ['message', 'connection_accepted', 'session', 'comment'].includes(item.type)) { 
       setChatConnectionId(item.referenceId); navigate('mensajes'); 
     } else if (item.type === 'connection_request') {
-      navigate('agenda'); 
+      navigate('coincidencias');
+      setNotice('Tienes una nueva solicitud de conexión.');
     }
   }
 
   const unreadCount = notifications.filter(item => !item.isRead).length;
   const primaryNavItems = navItems.slice(0, 4);
-  const secondaryTabActive = ['perfil', 'ranking', 'agenda', 'seguridad', 'panel', 'admin'].includes(tab);
+  const secondaryTabActive = ['perfil', 'ranking', 'seguridad', 'panel', 'admin'].includes(tab);
   const bottomActiveIndex = showMore || secondaryTabActive ? 4 : Math.max(0, primaryNavItems.findIndex(item => item.id === tab));
   const isChatActive = tab === 'mensajes';
   const isChatMobileConversation = isChatActive && Boolean(chatConnectionId) && typeof window !== 'undefined' && window.innerWidth < 900;
@@ -342,7 +336,6 @@ export function App() {
             {tab === 'coincidencias' && <ConnectionsExplorer matches={matches} requestId={selectedRequest} notify={setNotice} onRequestTopic={(topic: string) => { setRequestForm({ ...requestForm, topic, description: `Quiero encontrar una persona para aprender sobre ${topic}.`, helpType: 'comprender', desiredSchedule: '' }); navigate('solicitudes'); }} />}
             {tab === 'mensajes' && messagesView}
             {tab === 'ranking' && <Ranking notify={setNotice} />}
-            {tab === 'agenda' && <Agenda connections={connections} sessions={sessions} setConnections={setConnections} setSessions={setSessions} notify={setNotice} />}
             {tab === 'seguridad' && <Security connections={connections} notify={setNotice} />}
             {tab === 'panel' && <InstitutionalPanel />}
             {tab === 'admin' && <AdminPanel notify={setNotice} />}

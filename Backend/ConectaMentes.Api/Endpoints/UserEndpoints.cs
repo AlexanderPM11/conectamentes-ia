@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using ConectaMentes.Api.Auth;
 using ConectaMentes.Application.Auth;
+using ConectaMentes.Domain.Entities;
 using ConectaMentes.Infrastructure;
 using ConectaMentes.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Builder;
@@ -33,7 +34,7 @@ public static class UserEndpoints
 
         users.MapGet("/conectados", ([FromServices] IUserTracker tracker) => Results.Ok(tracker.GetOnlineUsers())).RequireAuthorization().WithName("GetOnlineUsers").WithOpenApi();
 
-        users.MapGet("/{id:guid}/perfil", async (Guid id, [FromServices] ConectaMentesDbContext db, CancellationToken ct) =>
+        users.MapGet("/{id:guid}/perfil", async (Guid id, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db, CancellationToken ct) =>
         {
             var user = await db.Users.SingleOrDefaultAsync(item => item.Id == id, ct);
             if (user is null) return Results.NotFound();
@@ -46,6 +47,16 @@ public static class UserEndpoints
             var ratingAverage = ratings.Count > 0 
                 ? ratings.Average(r => (r.Usefulness + r.Respect + r.Fulfillment + r.Clarity) / 4.0) 
                 : 0.0;
+            var viewerId = ApiIdentity.UserId(p);
+            var activeConnection = await db.Connections
+                .Where(connection => connection.Status == ConnectionStatus.Activa &&
+                    ((connection.RequesterId == viewerId && connection.CollaboratorId == id) ||
+                     (connection.CollaboratorId == viewerId && connection.RequesterId == id)))
+                .OrderByDescending(connection => connection.RequestId != null)
+                .FirstOrDefaultAsync(ct);
+            var myRating = activeConnection is null
+                ? null
+                : await db.Ratings.SingleOrDefaultAsync(rating => rating.ConnectionId == activeConnection.Id && rating.AuthorId == viewerId, ct);
 
             return Results.Ok(new {
                 userId = user.Id,
@@ -56,7 +67,9 @@ public static class UserEndpoints
                 totalRatings = ratings.Count,
                 badges,
                 skills,
-                availability
+                availability,
+                canRate = activeConnection is not null,
+                myRating = myRating is null ? null : new { myRating.Id, myRating.Usefulness, myRating.Respect, myRating.Fulfillment, myRating.Clarity, myRating.Comment, myRating.CreatedAt }
             });
         }).RequireAuthorization().WithName("GetUserProfile").WithOpenApi();
 

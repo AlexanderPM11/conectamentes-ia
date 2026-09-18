@@ -696,6 +696,17 @@
 .skill-item { position: relative; overflow: hidden; padding: 17px; border-radius: 18px; background: rgba(255,253,248,.72); box-shadow: 0 8px 18px rgba(23,59,53,.045); }
 .skill-item strong { font-size: 1.08rem; }
 .profile-actions-fixed .button { min-height: 52px; border-radius: 16px; }
+.profile-rating-card { margin: 6px 0 28px; padding: 20px; border-color: rgba(201,109,72,.2); background: linear-gradient(145deg, #fffdf8, #fbefe6); }
+.profile-rating-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.profile-rating-heading h3 { margin: 3px 0 0; font-family: Fraunces, Georgia, serif; font-size: 1.45rem; }
+.profile-rating-icon { display: grid; width: 40px; height: 40px; place-items: center; border-radius: 14px; color: #9a5b20; background: #fff0cf; font-size: 1.2rem; }
+.profile-rating-summary { display: grid; gap: 10px; margin-top: 16px; }
+.profile-rating-summary p { margin: 0; color: var(--muted); font-size: .82rem; line-height: 1.5; }
+.profile-rating-summary .star-display { font-size: 1.2rem; }
+.profile-rating-form { display: grid; gap: 8px; margin-top: 14px; }
+.profile-rating-form .star-rating { background: rgba(255,253,248,.52); }
+.profile-rating-form textarea { min-height: 76px; }
+.profile-rating-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
 
 @media(max-width:639px) {
   .profile-dedicated-view { padding-bottom: 0; }

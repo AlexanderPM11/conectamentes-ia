@@ -47,6 +47,48 @@ public static class RatingEndpoints
         var userRatings = endpoints.MapGroup("/api/usuarios/{id:guid}").RequireAuthorization().WithTags("Valoraciones");
         
         userRatings.MapGet("/reconocimientos", async (Guid id, [FromServices] ConectaMentesDbContext db) => Results.Ok(await db.Recognitions.Where(x => x.UserId == id).ToListAsync()));
+
+        userRatings.MapPut("/valoracion", async (Guid id, [FromBody] RatingInput input, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db, [FromServices] IHubContext<RealtimeHub> hub, [FromServices] DevicePushService devicePush) =>
+        {
+            var authorId = ApiIdentity.UserId(p);
+            if (authorId == id) return Results.BadRequest(new { message = "No puedes calificarte a ti mismo." });
+            if (input.Usefulness is < 1 or > 5 || input.Respect is < 1 or > 5 || input.Fulfillment is < 1 or > 5 || input.Clarity is < 1 or > 5)
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["rating"] = ["Cada calificación debe estar entre 1 y 5."] });
+            if ((input.Comment?.Trim().Length ?? 0) > 500)
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["comment"] = ["El comentario puede tener hasta 500 caracteres."] });
+
+            var connection = await db.Connections
+                .Where(item => item.Status == ConnectionStatus.Activa &&
+                    ((item.RequesterId == authorId && item.CollaboratorId == id) ||
+                     (item.CollaboratorId == authorId && item.RequesterId == id)))
+                .OrderByDescending(item => item.RequestId != null)
+                .FirstOrDefaultAsync();
+            if (connection is null) return Results.Forbid();
+
+            var rating = await db.Ratings.SingleOrDefaultAsync(item => item.ConnectionId == connection.Id && item.AuthorId == authorId);
+            var isNew = rating is null;
+            if (rating is null)
+            {
+                rating = new Rating { ConnectionId = connection.Id, AuthorId = authorId, EvaluatedUserId = id };
+                db.Ratings.Add(rating);
+            }
+            rating.Usefulness = input.Usefulness;
+            rating.Respect = input.Respect;
+            rating.Fulfillment = input.Fulfillment;
+            rating.Clarity = input.Clarity;
+            rating.Comment = input.Comment?.Trim() ?? "";
+
+            Notification? notification = null;
+            if (isNew)
+            {
+                var authorName = await db.Users.Where(user => user.Id == authorId).Select(user => user.DisplayName).SingleAsync();
+                notification = NotificationHelpers.NewNotification(id, "comment", "Nueva valoración recibida", string.IsNullOrWhiteSpace(rating.Comment) ? $"{authorName} valoró tu colaboración." : $"{authorName}: {rating.Comment}", connection.Id);
+                db.Notifications.Add(notification);
+            }
+            await db.SaveChangesAsync();
+            if (notification is not null) await NotificationHelpers.PushNotification(notification, hub, devicePush);
+            return Results.Ok(rating);
+        });
         
         userRatings.MapGet("/reputacion", async (Guid id, [FromServices] ConectaMentesDbContext db) =>
         {

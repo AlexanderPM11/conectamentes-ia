@@ -88,9 +88,12 @@ public static class DatabaseSetupExtensions
         await EnsureColumnAsync(db, "Users", "AccessStatusChangedAt");
         await EnsureColumnAsync(db, "Users", "AvatarPath");
         await EnsureColumnAsync(db, "Users", "AvatarUpdatedAt");
+        await EnsureColumnAsync(db, "Ratings", "ConnectionId");
+        await EnsureNullableColumnAsync(db, "Ratings", "SessionId");
         await EnsureNullableColumnAsync(db, "Connections", "RequestId");
         await EnsureNullableColumnAsync(db, "Connections", "MatchId");
         await EnsureIndexAsync(db, "Ratings", "UX_Ratings_SessionId_AuthorId", "CREATE UNIQUE INDEX `UX_Ratings_SessionId_AuthorId` ON `Ratings` (`SessionId`, `AuthorId`);");
+        await EnsureIndexAsync(db, "Ratings", "UX_Ratings_ConnectionId_AuthorId", "CREATE UNIQUE INDEX `UX_Ratings_ConnectionId_AuthorId` ON `Ratings` (`ConnectionId`, `AuthorId`);");
         
         var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
         await EnsureAdminRootAsync(db, config);
@@ -114,6 +117,7 @@ public static class DatabaseSetupExtensions
             ("Users", "AccessStatusChangedAt") => "ALTER TABLE `Users` ADD COLUMN `AccessStatusChangedAt` datetime(6) NULL;",
             ("Users", "AvatarPath") => "ALTER TABLE `Users` ADD COLUMN `AvatarPath` varchar(260) NULL;",
             ("Users", "AvatarUpdatedAt") => "ALTER TABLE `Users` ADD COLUMN `AvatarUpdatedAt` datetime(6) NULL;",
+            ("Ratings", "ConnectionId") => "ALTER TABLE `Ratings` ADD COLUMN `ConnectionId` char(36) CHARACTER SET ascii COLLATE ascii_general_ci NULL;",
             _ => throw new InvalidOperationException("Cambio de esquema no permitido.")
         };
         await db.Database.ExecuteSqlRawAsync(statement);
@@ -146,7 +150,7 @@ public static class DatabaseSetupExtensions
         var tableParameter = check.CreateParameter(); tableParameter.ParameterName = "@table"; tableParameter.Value = tableName; check.Parameters.Add(tableParameter);
         var indexParameter = check.CreateParameter(); indexParameter.ParameterName = "@index"; indexParameter.Value = indexName; check.Parameters.Add(indexParameter);
         if (Convert.ToInt32(await check.ExecuteScalarAsync()) > 0) return;
-        if (tableName != "Ratings" || indexName != "UX_Ratings_SessionId_AuthorId") throw new InvalidOperationException("Índice no permitido.");
+        if (tableName != "Ratings" || indexName is not ("UX_Ratings_SessionId_AuthorId" or "UX_Ratings_ConnectionId_AuthorId")) throw new InvalidOperationException("Índice no permitido.");
         await db.Database.ExecuteSqlRawAsync(statement);
     }
 
@@ -163,6 +167,7 @@ public static class DatabaseSetupExtensions
 
         var statement = (tableName, columnName) switch
         {
+            ("Ratings", "SessionId") => "ALTER TABLE `Ratings` MODIFY COLUMN `SessionId` char(36) CHARACTER SET ascii COLLATE ascii_general_ci NULL;",
             ("Connections", "RequestId") => "ALTER TABLE `Connections` MODIFY COLUMN `RequestId` char(36) CHARACTER SET ascii COLLATE ascii_general_ci NULL;",
             ("Connections", "MatchId") => "ALTER TABLE `Connections` MODIFY COLUMN `MatchId` char(36) CHARACTER SET ascii COLLATE ascii_general_ci NULL;",
             _ => throw new InvalidOperationException("Cambio de esquema no permitido.")
