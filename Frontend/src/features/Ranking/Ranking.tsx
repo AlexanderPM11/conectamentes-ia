@@ -29,13 +29,13 @@ export function Ranking({ notify }: { notify: (message: string) => void }) {
 
   return (
     <section className="screen">
-      <ScreenIntro kicker="REPUTACIÓN ACADÉMICA" title="Personas que dejan huella" description="Explora colaboradores valorados por quienes recibieron su orientación. La constancia pesa tanto como una buena nota." badge="network" />
+      <ScreenIntro kicker="REPUTACIÓN ACADÉMICA" title="Personas que dejan huella" description="Explora el top 10 de colaboradores valorados por quienes recibieron su orientación. La constancia pesa tanto como una buena nota." badge="network" />
       <section className="ranking-search surface-card">
         <div className="search-field">
           <Icon name="search" />
           <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Filtra por tema: cálculo, inglés, programación…" aria-label="Buscar colaboradores por tema" />
         </div>
-        <p><Icon name="shield" /> El orden se ajusta por experiencia para evitar resultados engañosos con una sola valoración.</p>
+        <p><Icon name="shield" /> Top 10 de la comunidad. El orden se ajusta por experiencia para evitar resultados engañosos con una sola valoración.</p>
       </section>
       {loading ? (
         <div className="discovery-loading"><span /><span /><span /></div>

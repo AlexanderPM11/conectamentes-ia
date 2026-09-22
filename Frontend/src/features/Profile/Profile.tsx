@@ -13,7 +13,7 @@ function getSkillConfidenceLabel(confidence: number) {
   }
 }
 
-export function Profile({ profile, setProfile, notify, userId, user, setMe }: any) {
+export function Profile({ profile, setProfile, notify, userId, user, setMe, onOpenRanking }: any) {
   const [skill, setSkill] = useState({ topic: '', type: 'Domina', confidence: 4, visible: true });
   const [details, setDetails] = useState({ displayName: user?.displayName ?? '', career: user?.career ?? '', academicTerm: user?.academicTerm ?? '' });
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -23,8 +23,10 @@ export function Profile({ profile, setProfile, notify, userId, user, setMe }: an
   const [editingSkillId, setEditingSkillId] = useState<string | null>(null);
   const [pendingSkillDelete, setPendingSkillDelete] = useState<any | null>(null);
   const [reputation, setReputation] = useState<any>(null);
+  const [ranking, setRanking] = useState<any>(null);
 
   useEffect(() => { if (userId) api('/api/usuarios/' + userId + '/reputacion').then(setReputation).catch(() => undefined); }, [userId]);
+  useEffect(() => { if (userId) api('/api/ranking/me').then(setRanking).catch(() => undefined); }, [userId, reputation?.total]);
   useEffect(() => { setDetails({ displayName: user?.displayName ?? '', career: user?.career ?? '', academicTerm: user?.academicTerm ?? '' }); }, [user?.displayName, user?.career, user?.academicTerm]);
   useEffect(() => { if (!avatarFile) { setAvatarPreview(''); return; } const url = URL.createObjectURL(avatarFile); setAvatarPreview(url); return () => URL.revokeObjectURL(url); }, [avatarFile]);
 
@@ -116,6 +118,18 @@ export function Profile({ profile, setProfile, notify, userId, user, setMe }: an
     <section className="screen">
       <ScreenIntro kicker="MI PERFIL" title="Tu perfil de orientador" description="Registra las materias que dominas para que tus compañeros puedan solicitar tu orientación." badge="book" />
       {reputation && <ReputationSummary reputation={reputation} title="Mi reputación como colaborador" /> }
+      <section className="profile-ranking-card surface-card">
+        <div className="profile-ranking-copy">
+          <p className="eyebrow">MI POSICIÓN</p>
+          <h2>Tu lugar en la comunidad</h2>
+          <p>{ranking?.position ? `Estás en el puesto ${ranking.position} entre ${ranking.totalParticipants} colaboradores con valoraciones.` : 'Completa una orientación y recibe valoraciones para aparecer en el ranking.'}</p>
+        </div>
+        <div className="profile-ranking-score" aria-label={ranking?.position ? `Puesto ${ranking.position}` : 'Sin puesto todavía'}>
+          <span>{ranking?.position ? `#${ranking.position}` : '—'}</span>
+          <small>{ranking?.item ? `${Number(ranking.item.average).toFixed(1)} promedio` : 'Sin valoraciones'}</small>
+        </div>
+        <button type="button" className="button button-secondary small profile-ranking-action" onClick={onOpenRanking}>Ver top 10</button>
+      </section>
       
       <section className="profile-editor surface-card">
         <div className="profile-editor-visual">

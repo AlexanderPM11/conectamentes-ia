@@ -332,7 +332,7 @@ export function App() {
           <div className="screen-content">
             {notice && <div className="toast" role="status"><span>✓</span>{notice}<button onClick={() => setNotice('')} aria-label="Cerrar mensaje">×</button></div>}
             {tab === 'inicio' && <Home me={me} profile={profile} requests={requests} connections={connections} navigate={navigate} />}
-            {tab === 'perfil' && <Profile profile={profile} setProfile={setProfile} notify={setNotice} userId={me?.id} user={me} setMe={setMe} />}
+            {tab === 'perfil' && <Profile profile={profile} setProfile={setProfile} notify={setNotice} userId={me?.id} user={me} setMe={setMe} onOpenRanking={() => navigate('ranking')} />}
             {tab === 'solicitudes' && <Requests requests={requests} form={requestForm} setForm={setRequestForm} submit={submitRequest} calculate={calculate} notify={setNotice} editingRequest={editingRequest} setEditingRequest={setEditingRequest} deleteRequest={deleteRequest} />}
             {tab === 'coincidencias' && <ConnectionsExplorer matches={matches} requestId={selectedRequest} notify={setNotice} onRequestTopic={(topic: string) => { setRequestForm({ ...requestForm, topic, description: `Quiero encontrar una persona para aprender sobre ${topic}.`, helpType: 'comprender', desiredSchedule: '' }); navigate('solicitudes'); }} />}
             {tab === 'mensajes' && messagesView}
