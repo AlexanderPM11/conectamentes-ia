@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, Fragment, ChangeEvent, FormEv
 import { API, api } from '../../shared/api/client';
 import { initials } from '../../utils/string';
 import { ScreenIntro, Icon, IsoBadge, EmptyState, ConfirmDialog, ProfileAvatar } from '../../components';
+import { requestGoogleCalendarAccess } from '../../utils/google';
 
 const CHAT_FILE_ACCEPT = 'image/jpeg,image/png,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const MAX_CHAT_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -12,6 +13,8 @@ function dominicanDateKey(isoDate: string) { return new Date(isoDate).toLocaleDa
 function formatChatDayDivider(isoDate: string) { const d = new Date(isoDate); const today = new Date(); const isToday = d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear(); return isToday ? 'Hoy' : d.toLocaleDateString('es-DO', { timeZone: 'America/Santo_Domingo', weekday: 'long', day: 'numeric', month: 'long' }); }
 function formatDominicanTime(isoDate: string) { return new Date(isoDate).toLocaleTimeString('es-DO', { timeZone: 'America/Santo_Domingo', hour: 'numeric', minute: '2-digit', hour12: true }); }
 function formatRelative(isoDate: string) { const now = new Date(); const d = new Date(isoDate); const diffMin = Math.floor((now.getTime() - d.getTime()) / 60000); if (diffMin < 1) return 'ahora'; if (diffMin < 60) return `${diffMin} min`; const diffHrs = Math.floor(diffMin / 60); if (diffHrs < 24) return `${diffHrs} h`; const diffDays = Math.floor(diffHrs / 24); if (diffDays < 7) return `${diffDays} d`; return d.toLocaleDateString('es-DO'); }
+function formatMeetingDate(isoDate: string) { return new Date(isoDate).toLocaleDateString('es-DO', { timeZone: 'America/Santo_Domingo', weekday: 'short', day: 'numeric', month: 'short' }); }
+function formatMeetingTime(isoDate: string) { return new Date(isoDate).toLocaleTimeString('es-DO', { timeZone: 'America/Santo_Domingo', hour: 'numeric', minute: '2-digit', hour12: true }); }
 function formatFileSize(bytes: number) { if (bytes < 1024) return bytes + ' B'; if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'; return (bytes / 1048576).toFixed(1) + ' MB'; }
 function isImageFile(file: File) { return file.type.startsWith('image/') || IMAGE_EXTENSIONS.some(extension => file.name.toLowerCase().endsWith(extension)); }
 async function openChatAttachment(attachment: any) { const token = localStorage.getItem('conectamente_token'); const response = await fetch(`${API}/api/adjuntos/${attachment.id}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} }); if (!response.ok) throw new Error('El archivo no está disponible.'); const blob = await response.blob(); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = attachment.fileName; a.click(); setTimeout(() => URL.revokeObjectURL(url), 5000); }
@@ -26,6 +29,10 @@ export function Messages({ connections, selectedId, setSelectedId, messagesByCon
   const [pendingDelete, setPendingDelete] = useState<any | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [upcomingSessions, setUpcomingSessions] = useState<any[]>([]);
+  const [showChatMore, setShowChatMore] = useState(false);
+  const [showMeetPicker, setShowMeetPicker] = useState(false);
+  const [meetingSessionId, setMeetingSessionId] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const draftInput = useRef<HTMLTextAreaElement>(null);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
@@ -59,6 +66,21 @@ export function Messages({ connections, selectedId, setSelectedId, messagesByCon
     api('/api/conexiones/' + currentId + '/mensajes')
       .then(items => setMessagesByConnection((value: any) => ({ ...value, [currentId]: items })))
       .catch((error: unknown) => notify(error instanceof Error ? error.message : 'No pudimos abrir la conversación.'));
+  }, [currentId]);
+
+  useEffect(() => {
+    if (!currentId) {
+      setUpcomingSessions([]);
+      return;
+    }
+    let cancelled = false;
+    api('/api/sesiones')
+      .then(items => {
+        if (cancelled) return;
+        setUpcomingSessions(items.filter((item: any) => item.connectionId === currentId && (item.status === 'Agendada' || item.status === 0) && new Date(item.date).getTime() >= Date.now()));
+      })
+      .catch(() => { if (!cancelled) setUpcomingSessions([]); });
+    return () => { cancelled = true; };
   }, [currentId]);
 
   useEffect(() => {
@@ -171,6 +193,25 @@ export function Messages({ connections, selectedId, setSelectedId, messagesByCon
       notify(error instanceof Error ? error.message : 'No pudimos eliminar el mensaje.');
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function createGoogleMeet(session: any) {
+    setMeetingSessionId(session.id);
+    try {
+      const accessToken = await requestGoogleCalendarAccess();
+      const result = await api(`/api/sesiones/${session.id}/google-meet`, { method: 'POST', body: JSON.stringify({ accessToken }) });
+      setShowMeetPicker(false);
+      setShowChatMore(false);
+      if (!result.pending) {
+        const refreshed = await api(`/api/conexiones/${currentId}/mensajes`);
+        setMessagesByConnection((value: any) => ({ ...value, [currentId]: refreshed }));
+      }
+      notify(result.pending ? result.message : 'Google Meet creado y compartido en esta conversación.');
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'No pudimos crear Google Meet.');
+    } finally {
+      setMeetingSessionId(null);
     }
   }
 
@@ -397,6 +438,16 @@ export function Messages({ connections, selectedId, setSelectedId, messagesByCon
                 >
                   ＋
                 </button>
+                <button
+                  type="button"
+                  className="chat-more-button"
+                  onClick={() => setShowChatMore(value => !value)}
+                  aria-label="Más opciones de la conversación"
+                  aria-expanded={showChatMore}
+                  title="Más opciones"
+                >
+                  ⋯
+                </button>
                 <textarea
                   ref={draftInput}
                   value={draft}
@@ -450,6 +501,14 @@ export function Messages({ connections, selectedId, setSelectedId, messagesByCon
                   {sending ? '…' : '↗'}
                 </button>
               </div>
+              {showChatMore && (
+                <div className="chat-more-menu" role="menu">
+                  <button type="button" role="menuitem" className="chat-more-item" onClick={() => { setShowMeetPicker(true); setShowChatMore(false); }}>
+                    <span className="chat-more-icon">⌁</span>
+                    <span><strong>Crear Google Meet</strong><small>Comparte una reunión para una sesión futura</small></span>
+                  </button>
+                </div>
+              )}
             </form>
           </section>
         ) : (
@@ -464,7 +523,38 @@ export function Messages({ connections, selectedId, setSelectedId, messagesByCon
       </div>
       {lightboxAttachment && <ChatImageLightbox attachment={lightboxAttachment} notify={notify} onClose={() => setLightboxAttachment(null)} />}
       {pendingDelete && <ConfirmDialog title="¿Eliminar este mensaje?" message="Se quitará este mensaje y cualquier archivo adjunto de la conversación. Esta acción no se puede deshacer." confirmLabel={deleting ? 'Eliminando…' : 'Eliminar mensaje'} onConfirm={deleteMessage} onCancel={() => { if (!deleting) setPendingDelete(null); }} />}
+      {showMeetPicker && <MeetPicker sessions={upcomingSessions} meetingSessionId={meetingSessionId} onCreate={createGoogleMeet} onClose={() => setShowMeetPicker(false)} />}
     </section>
+  );
+}
+
+function MeetPicker({ sessions, meetingSessionId, onCreate, onClose }: { sessions: any[]; meetingSessionId: string | null; onCreate: (session: any) => void; onClose: () => void }) {
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape' && !meetingSessionId) onClose(); };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [meetingSessionId, onClose]);
+
+  return (
+    <div className="custom-dialog-backdrop" role="presentation" onMouseDown={event => { if (event.currentTarget === event.target && !meetingSessionId) onClose(); }}>
+      <section className="custom-dialog meet-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="meet-picker-title">
+        <div className="custom-dialog-head">
+          <span className="dialog-icon meet-dialog-icon">⌁</span>
+          <button type="button" className="dialog-close" onClick={onClose} disabled={Boolean(meetingSessionId)} aria-label="Cerrar opciones de Google Meet">×</button>
+        </div>
+        <p className="eyebrow">VIDEOLLAMADA</p>
+        <h2 id="meet-picker-title">Crear un Google Meet</h2>
+        <p className="meet-picker-intro">Elige una sesión virtual futura. El enlace se guardará en la agenda y se compartirá aquí con tu compañero.</p>
+        {sessions.length ? <div className="meet-session-options">{sessions.map(session => (
+          <button type="button" className="meet-session-option" key={session.id} onClick={() => onCreate(session)} disabled={Boolean(meetingSessionId)}>
+            <span className="meet-session-date"><b>{formatMeetingDate(session.date)}</b><small>{formatMeetingTime(session.date)}</small></span>
+            <span className="meet-session-details"><strong>{session.objective || 'Sesión de aprendizaje'}</strong><small>{session.durationMinutes} min · Sesión virtual</small></span>
+            <span className="meet-session-arrow">↗</span>
+          </button>
+        ))}</div> : <div className="meet-picker-empty"><strong>No hay sesiones virtuales futuras</strong><p>Agenda primero un encuentro virtual para poder crear y compartir su enlace.</p></div>}
+        <div className="custom-dialog-actions"><button type="button" className="button button-ghost" onClick={onClose} disabled={Boolean(meetingSessionId)}>Cerrar</button></div>
+      </section>
+    </div>
   );
 }
 
