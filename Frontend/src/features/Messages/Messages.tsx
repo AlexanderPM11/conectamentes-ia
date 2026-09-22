@@ -466,7 +466,7 @@ export function Messages({ connections, selectedId, setSelectedId, messagesByCon
                   aria-expanded={showChatMore}
                   title="Más opciones"
                 >
-                  ⋯
+                  Más
                 </button>
                 <textarea
                   ref={draftInput}
