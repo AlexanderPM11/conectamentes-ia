@@ -129,6 +129,49 @@ public static class ConnectionEndpoints
             return Results.Ok(item);
         });
 
+        connections.MapPost("/{id:guid}/google-meet", async (Guid id, [FromBody] GoogleMeetRequest input, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db, [FromServices] GoogleCalendarService calendar, [FromServices] IHubContext<RealtimeHub> hub, [FromServices] DevicePushService devicePush, CancellationToken ct) =>
+        {
+            var userId = ApiIdentity.UserId(p);
+            var connection = await db.Connections.SingleOrDefaultAsync(item => item.Id == id && item.Status == ConnectionStatus.Activa && (item.RequesterId == userId || item.CollaboratorId == userId), ct);
+            if (connection is null) return Results.NotFound();
+
+            var participants = await db.Users
+                .Where(user => user.Id == connection.RequesterId || user.Id == connection.CollaboratorId)
+                .Select(user => new { user.Id, user.Email, user.DisplayName })
+                .ToListAsync(ct);
+            var topic = connection.RequestId == null
+                ? "Conexión directa"
+                : await db.SupportRequests.Where(request => request.Id == connection.RequestId).Select(request => request.Topic).FirstOrDefaultAsync(ct) ?? "Aprendizaje compartido";
+            var startsAt = DateTimeOffset.UtcNow.AddMinutes(1);
+            GoogleMeetingResult meeting;
+            try
+            {
+                meeting = await calendar.CreateOrGetMeetingAsync(input.AccessToken, null, topic, "Videollamada de aprendizaje", startsAt, 30, participants.Select(user => user.Email).ToArray(), ct);
+            }
+            catch (GoogleCalendarException ex)
+            {
+                return Results.Problem(statusCode: 502, title: "No pudimos crear Google Meet", detail: ex.Message);
+            }
+
+            var session = new LearningSession { ConnectionId = id, Date = startsAt, DurationMinutes = 30, Mode = "virtual", Objective = "Videollamada de aprendizaje", GoogleCalendarEventId = meeting.EventId, MeetUrl = meeting.MeetUrl };
+            db.Add(session);
+            if (meeting.MeetUrl is null)
+            {
+                await db.SaveChangesAsync(ct);
+                return Results.Accepted(value: new { pending = true, calendarUrl = meeting.CalendarUrl, message = "Google está preparando el enlace. Aparecerá en el chat en unos segundos." });
+            }
+
+            var creator = participants.Single(user => user.Id == userId);
+            var recipientId = connection.RequesterId == userId ? connection.CollaboratorId : connection.RequesterId;
+            var chatMessage = new ChatMessage { ConnectionId = id, SenderId = userId, Text = $"Google Meet para nuestra videollamada: {meeting.MeetUrl}" };
+            var notification = NotificationHelpers.NewNotification(recipientId, "meeting", "Google Meet listo", $"{creator.DisplayName} creó un enlace para conversar sobre {topic}.", id);
+            db.AddRange(chatMessage, notification);
+            await db.SaveChangesAsync(ct);
+            await hub.Clients.Groups(RealtimeHub.UserGroup(connection.RequesterId), RealtimeHub.UserGroup(connection.CollaboratorId)).SendAsync("ChatMessageReceived", ChatHelpers.ChatMessageView(chatMessage, creator.DisplayName, false, null), ct);
+            await NotificationHelpers.PushNotification(notification, hub, devicePush, ct);
+            return Results.Ok(new { meetUrl = meeting.MeetUrl, pending = false });
+        });
+
         connections.MapPost("/{id:guid}/sesiones", async (Guid id, [FromBody] SessionInput input, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db, [FromServices] IHubContext<RealtimeHub> hub, [FromServices] DevicePushService devicePush) =>
         {
             if (SessionHelpers.ValidateSessionInput(input) is { } validationError) return validationError;

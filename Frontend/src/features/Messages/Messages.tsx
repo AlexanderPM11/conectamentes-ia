@@ -215,6 +215,26 @@ export function Messages({ connections, selectedId, setSelectedId, messagesByCon
     }
   }
 
+  async function createInstantGoogleMeet() {
+    if (!currentId) return;
+    setMeetingSessionId('instant');
+    try {
+      const accessToken = await requestGoogleCalendarAccess();
+      const result = await api(`/api/conexiones/${currentId}/google-meet`, { method: 'POST', body: JSON.stringify({ accessToken }) });
+      setShowMeetPicker(false);
+      setShowChatMore(false);
+      if (!result.pending) {
+        const refreshed = await api(`/api/conexiones/${currentId}/mensajes`);
+        setMessagesByConnection((value: any) => ({ ...value, [currentId]: refreshed }));
+      }
+      notify(result.pending ? result.message : 'Meet creado y enviado automáticamente al chat.');
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'No pudimos crear Google Meet.');
+    } finally {
+      setMeetingSessionId(null);
+    }
+  }
+
   const filteredActive = active.filter((item: any) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
@@ -523,12 +543,12 @@ export function Messages({ connections, selectedId, setSelectedId, messagesByCon
       </div>
       {lightboxAttachment && <ChatImageLightbox attachment={lightboxAttachment} notify={notify} onClose={() => setLightboxAttachment(null)} />}
       {pendingDelete && <ConfirmDialog title="¿Eliminar este mensaje?" message="Se quitará este mensaje y cualquier archivo adjunto de la conversación. Esta acción no se puede deshacer." confirmLabel={deleting ? 'Eliminando…' : 'Eliminar mensaje'} onConfirm={deleteMessage} onCancel={() => { if (!deleting) setPendingDelete(null); }} />}
-      {showMeetPicker && <MeetPicker sessions={upcomingSessions} meetingSessionId={meetingSessionId} onCreate={createGoogleMeet} onClose={() => setShowMeetPicker(false)} />}
+      {showMeetPicker && <MeetPicker sessions={upcomingSessions} meetingSessionId={meetingSessionId} onCreate={createGoogleMeet} onCreateInstant={createInstantGoogleMeet} onClose={() => setShowMeetPicker(false)} />}
     </section>
   );
 }
 
-function MeetPicker({ sessions, meetingSessionId, onCreate, onClose }: { sessions: any[]; meetingSessionId: string | null; onCreate: (session: any) => void; onClose: () => void }) {
+function MeetPicker({ sessions, meetingSessionId, onCreate, onCreateInstant, onClose }: { sessions: any[]; meetingSessionId: string | null; onCreate: (session: any) => void; onCreateInstant: () => void; onClose: () => void }) {
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape' && !meetingSessionId) onClose(); };
     document.addEventListener('keydown', closeOnEscape);
@@ -551,7 +571,7 @@ function MeetPicker({ sessions, meetingSessionId, onCreate, onClose }: { session
             <span className="meet-session-details"><strong>{session.objective || 'Sesión de aprendizaje'}</strong><small>{session.durationMinutes} min · Sesión virtual</small></span>
             <span className="meet-session-arrow">↗</span>
           </button>
-        ))}</div> : <div className="meet-picker-empty"><strong>No hay sesiones virtuales futuras</strong><p>Agenda primero un encuentro virtual para poder crear y compartir su enlace.</p></div>}
+        ))}</div> : <div className="meet-picker-empty"><strong>No hay sesiones virtuales futuras</strong><p>Crea una videollamada de 30 minutos ahora y el enlace se enviará automáticamente a este chat.</p><button type="button" className="button button-primary full-width" onClick={onCreateInstant} disabled={Boolean(meetingSessionId)}>{meetingSessionId === 'instant' ? 'Creando Meet…' : 'Crear Meet y enviar enlace'}</button></div>}
         <div className="custom-dialog-actions"><button type="button" className="button button-ghost" onClick={onClose} disabled={Boolean(meetingSessionId)}>Cerrar</button></div>
       </section>
     </div>
