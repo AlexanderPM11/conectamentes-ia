@@ -38,7 +38,7 @@ public static class DiscoveryEndpoints
                             Confidence = topSkill != null ? topSkill.Confidence : 3,
                             DisplayName = user.DisplayName,
                             Career = user.Career,
-                            hasConnection = db.Connections.Any(connection => connection.Status != ConnectionStatus.Rechazada && ((connection.RequesterId == userId && connection.CollaboratorId == user.Id) || (connection.CollaboratorId == userId && connection.RequesterId == user.Id))),
+                            hasConnection = db.Connections.Any(connection => (connection.Status == ConnectionStatus.PendienteColaborador || connection.Status == ConnectionStatus.Activa) && ((connection.RequesterId == userId && connection.CollaboratorId == user.Id) || (connection.CollaboratorId == userId && connection.RequesterId == user.Id))),
                             isConnected = db.Connections.Any(connection => connection.Status == ConnectionStatus.Activa && ((connection.RequesterId == userId && connection.CollaboratorId == user.Id) || (connection.CollaboratorId == userId && connection.RequesterId == user.Id)))
                         };
             if (!string.IsNullOrWhiteSpace(normalizedTopic)) query = query.Where(item => item.Topic.ToLower().Contains(normalizedTopic) || item.DisplayName.ToLower().Contains(normalizedTopic));
@@ -67,7 +67,7 @@ public static class DiscoveryEndpoints
                 .Where(skill => skill.Visible && skill.Type == SkillType.Domina)
                 .ToListAsync();
             var connectedUserIds = await db.Connections
-                .Where(connection => connection.Status != ConnectionStatus.Rechazada && (connection.RequesterId == userId || connection.CollaboratorId == userId))
+                .Where(connection => (connection.Status == ConnectionStatus.PendienteColaborador || connection.Status == ConnectionStatus.Activa) && (connection.RequesterId == userId || connection.CollaboratorId == userId))
                 .Select(connection => connection.RequesterId == userId ? connection.CollaboratorId : connection.RequesterId)
                 .ToListAsync();
             var activeConnectedUserIds = await db.Connections

@@ -32,7 +32,8 @@ public static class ConnectionEndpoints
                     counterpartId = x.RequesterId == userId ? x.CollaboratorId : x.RequesterId,
                     counterpart = db.Users.Where(u => u.Id == (x.RequesterId == userId ? x.CollaboratorId : x.RequesterId)).Select(u => u.DisplayName).FirstOrDefault(),
                     counterpartAvatarUpdatedAt = db.Users.Where(u => u.Id == (x.RequesterId == userId ? x.CollaboratorId : x.RequesterId)).Select(u => u.AvatarUpdatedAt).FirstOrDefault(),
-                    requiresMyResponse = x.CollaboratorId == userId && x.Status == ConnectionStatus.PendienteColaborador
+                    requiresMyResponse = x.CollaboratorId == userId && x.Status == ConnectionStatus.PendienteColaborador,
+                    isRequester = x.RequesterId == userId
                 })
                 .ToListAsync());
         });
@@ -42,7 +43,7 @@ public static class ConnectionEndpoints
             var request = await db.SupportRequests.SingleOrDefaultAsync(x => x.Id == requestId);
             if (request is null) return Results.NotFound();
             if (request.UserId == userId) return Results.BadRequest("No puedes ofrecer apoyo a tu propia solicitud.");
-            var existing = await db.Connections.SingleOrDefaultAsync(x => x.RequestId == requestId && x.RequesterId == request.UserId && x.CollaboratorId == userId);
+            var existing = await db.Connections.SingleOrDefaultAsync(x => x.RequestId == requestId && x.RequesterId == request.UserId && x.CollaboratorId == userId && (x.Status == ConnectionStatus.PendienteColaborador || x.Status == ConnectionStatus.Activa));
             if (existing is not null) return Results.Ok(existing);
             
             var connection = new Connection { RequestId = requestId, RequesterId = request.UserId, CollaboratorId = userId, Status = ConnectionStatus.PendienteColaborador };
@@ -61,7 +62,7 @@ public static class ConnectionEndpoints
             var target = await db.Users.SingleOrDefaultAsync(x => x.Id == targetUserId);
             if (target is null) return Results.NotFound();
             
-            var existing = await db.Connections.SingleOrDefaultAsync(x => x.RequestId == null && ((x.RequesterId == userId && x.CollaboratorId == targetUserId) || (x.RequesterId == targetUserId && x.CollaboratorId == userId)));
+            var existing = await db.Connections.SingleOrDefaultAsync(x => x.RequestId == null && (x.Status == ConnectionStatus.PendienteColaborador || x.Status == ConnectionStatus.Activa) && ((x.RequesterId == userId && x.CollaboratorId == targetUserId) || (x.CollaboratorId == userId && x.RequesterId == targetUserId)));
             if (existing is not null) return Results.Ok(existing);
             
             var connection = new Connection { RequestId = null, RequesterId = userId, CollaboratorId = targetUserId, Status = ConnectionStatus.PendienteColaborador };
@@ -97,10 +98,26 @@ public static class ConnectionEndpoints
             });
         });
 
+        connections.MapPost("/{id:guid}/cancelar", async (Guid id, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db, [FromServices] IHubContext<RealtimeHub> hub, [FromServices] DevicePushService devicePush) =>
+        {
+            var userId = ApiIdentity.UserId(p);
+            var item = await db.Connections.SingleOrDefaultAsync(x => x.Id == id && (x.RequesterId == userId || x.CollaboratorId == userId) && (x.Status == ConnectionStatus.PendienteColaborador || x.Status == ConnectionStatus.Activa));
+            if (item is null) return Results.NotFound();
+            item.Status = ConnectionStatus.Cancelada;
+            var requesterName = await db.Users.Where(x => x.Id == userId).Select(x => x.DisplayName).SingleAsync();
+            var topic = item.RequestId != null ? await db.SupportRequests.Where(x => x.Id == item.RequestId).Select(x => x.Topic).FirstOrDefaultAsync() : "aprender juntos";
+            var recipientId = item.RequesterId == userId ? item.CollaboratorId : item.RequesterId;
+            var notification = NotificationHelpers.NewNotification(recipientId, "connection_cancelled", "Conexión cerrada", $"{requesterName} cerró la conexión sobre {topic}. Ya no podrán conversar en este chat.", item.Id);
+            db.Add(notification);
+            await db.SaveChangesAsync();
+            await NotificationHelpers.PushNotification(notification, hub, devicePush);
+            return Results.Ok(item);
+        });
+
         connections.MapPost("/{id:guid}/responder", async (Guid id, [FromBody] ConnectionResponse input, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db, [FromServices] IHubContext<RealtimeHub> hub, [FromServices] DevicePushService devicePush) =>
         {
             var userId = ApiIdentity.UserId(p);
-            var item = await db.Connections.SingleOrDefaultAsync(x => x.Id == id && x.CollaboratorId == userId);
+            var item = await db.Connections.SingleOrDefaultAsync(x => x.Id == id && x.CollaboratorId == userId && x.Status == ConnectionStatus.PendienteColaborador);
             if (item is null) return Results.NotFound();
             item.Status = input.Accept ? ConnectionStatus.Activa : ConnectionStatus.Rechazada;
             var collaboratorName = await db.Users.Where(x => x.Id == userId).Select(x => x.DisplayName).SingleAsync();

@@ -3,7 +3,7 @@ namespace ConectaMentes.Domain.Entities;
 public enum SkillType { Domina, NecesitaApoyo }
 public enum RequestStatus { Abierta, ConCoincidencias, Conectada, Cerrada, Cancelada }
 public enum MatchStatus { Sugerida, Rechazada, Aceptada }
-public enum ConnectionStatus { PendienteColaborador, Activa, Rechazada }
+public enum ConnectionStatus { PendienteColaborador, Activa, Rechazada, Cancelada }
 public enum SessionStatus { Agendada, Completada, Cancelada }
 public enum ReportStatus { Abierto, EnRevision, Resuelto }
 
