@@ -69,6 +69,8 @@ public static class UserEndpoints
                 skills,
                 availability,
                 canRate = activeConnection is not null,
+                isConnected = activeConnection is not null,
+                activeConnectionId = activeConnection?.Id,
                 myRating = myRating is null ? null : new { myRating.Id, myRating.Usefulness, myRating.Respect, myRating.Fulfillment, myRating.Clarity, myRating.Comment, myRating.CreatedAt }
             });
         }).RequireAuthorization().WithName("GetUserProfile").WithOpenApi();

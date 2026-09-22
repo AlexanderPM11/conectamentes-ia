@@ -4,7 +4,7 @@ import { initials } from '../../utils/string';
 import { ScreenIntro, Icon, IsoBadge, EmptyState, ProfileAvatar } from '../../components';
 import { UserProfileView } from './UserProfileView';
 
-export function ConnectionsExplorer({ matches, requestId, notify, onRequestTopic }: any) {
+export function ConnectionsExplorer({ matches, requestId, notify, onRequestTopic, onOpenChat }: any) {
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<'todas' | 'necesito_apoyo'>(requestId ? 'necesito_apoyo' : 'todas');
   const [results, setResults] = useState<any[]>([]);
@@ -43,6 +43,7 @@ export function ConnectionsExplorer({ matches, requestId, notify, onRequestTopic
           setSelectedUserId(null);
           onRequestTopic(topic);
         }}
+        onOpenChat={onOpenChat}
         onConnect={async () => {
           try {
             if (selectedItem?.score !== undefined) {
@@ -109,7 +110,7 @@ function DiscoveryResults({ results, loading, labelFor, notify, onSelectUser, se
               <div className="discovery-meta">
                 <span>Confianza {item.confidence}/5</span>
                 {item.hasConnection ? (
-                  <span className="status-pill">Ya conectados</span>
+                  <span className="status-pill">{item.isConnected ? 'Ya conectados' : 'Solicitud en proceso'}</span>
                 ) : (
                   <button className="button button-primary small" onClick={async (e) => {
                     e.stopPropagation();

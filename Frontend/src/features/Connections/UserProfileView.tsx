@@ -9,9 +9,10 @@ interface UserProfileViewProps {
   onConnect: () => void;
   onRequestSupport: (topic: string) => void;
   alreadyConnected: boolean;
+  onOpenChat: (connectionId: string) => void;
 }
 
-export function UserProfileView({ userId, onBack, onConnect, onRequestSupport, alreadyConnected }: UserProfileViewProps) {
+export function UserProfileView({ userId, onBack, onConnect, onRequestSupport, alreadyConnected, onOpenChat }: UserProfileViewProps) {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -219,8 +220,12 @@ export function UserProfileView({ userId, onBack, onConnect, onRequestSupport, a
       )}
 
       <div className="profile-actions-fixed">
-        {alreadyConnected ? (
-          <div className="status-pill big">Ya están conectados</div>
+        {profile.isConnected && profile.activeConnectionId ? (
+          <button className="button button-primary large full-width" onClick={() => onOpenChat(profile.activeConnectionId)}>
+            <Icon name="message" /> Conversar con {profile.displayName}
+          </button>
+        ) : alreadyConnected ? (
+          <div className="status-pill big">Solicitud en proceso</div>
         ) : (
           <button className="button button-primary large full-width" onClick={onConnect}>
             Enviar solicitud de conexión

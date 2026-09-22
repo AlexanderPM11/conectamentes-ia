@@ -21,7 +21,7 @@ public static class ChatEndpoints
         chat.MapGet("/mensajes", async (Guid id, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db) =>
         {
             var userId = ApiIdentity.UserId(p);
-            if (!await db.Connections.AnyAsync(x => x.Id == id && (x.RequesterId == userId || x.CollaboratorId == userId))) return Results.NotFound();
+            if (!await db.Connections.AnyAsync(x => x.Id == id && x.Status == ConnectionStatus.Activa && (x.RequesterId == userId || x.CollaboratorId == userId))) return Results.NotFound();
             var rows = await (from message in db.ChatMessages join sender in db.Users on message.SenderId equals sender.Id where message.ConnectionId == id orderby message.CreatedAt descending select new { Message = message, Sender = sender.DisplayName }).Take(100).ToListAsync();
             rows.Reverse();
             var messageIds = rows.Select(row => row.Message.Id).ToList();
