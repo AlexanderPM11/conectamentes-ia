@@ -30,7 +30,7 @@ export function Messages({ connections, selectedId, setSelectedId, messagesByCon
   const [deleting, setDeleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [upcomingSessions, setUpcomingSessions] = useState<any[]>([]);
-  const [showChatMore, setShowChatMore] = useState(false);
+  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const [showMeetPicker, setShowMeetPicker] = useState(false);
   const [meetingSessionId, setMeetingSessionId] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -202,7 +202,7 @@ export function Messages({ connections, selectedId, setSelectedId, messagesByCon
       const accessToken = await requestGoogleCalendarAccess();
       const result = await api(`/api/sesiones/${session.id}/google-meet`, { method: 'POST', body: JSON.stringify({ accessToken }) });
       setShowMeetPicker(false);
-      setShowChatMore(false);
+      setShowAttachmentMenu(false);
       if (!result.pending) {
         const refreshed = await api(`/api/conexiones/${currentId}/mensajes`);
         setMessagesByConnection((value: any) => ({ ...value, [currentId]: refreshed }));
@@ -222,7 +222,7 @@ export function Messages({ connections, selectedId, setSelectedId, messagesByCon
       const accessToken = await requestGoogleCalendarAccess();
       const result = await api(`/api/conexiones/${currentId}/google-meet`, { method: 'POST', body: JSON.stringify({ accessToken }) });
       setShowMeetPicker(false);
-      setShowChatMore(false);
+      setShowAttachmentMenu(false);
       if (!result.pending) {
         const refreshed = await api(`/api/conexiones/${currentId}/mensajes`);
         setMessagesByConnection((value: any) => ({ ...value, [currentId]: refreshed }));
@@ -452,21 +452,12 @@ export function Messages({ connections, selectedId, setSelectedId, messagesByCon
                 <button
                   type="button"
                   className="attach-button"
-                  onClick={() => fileInput.current?.click()}
-                  aria-label="Adjuntar imagen o documento"
-                  title="Adjuntar archivo"
+                  onClick={() => setShowAttachmentMenu(value => !value)}
+                  aria-label="Abrir opciones para adjuntar"
+                  aria-expanded={showAttachmentMenu}
+                  title="Adjuntar"
                 >
                   ＋
-                </button>
-                <button
-                  type="button"
-                  className="chat-more-button"
-                  onClick={() => setShowChatMore(value => !value)}
-                  aria-label="Más opciones de la conversación"
-                  aria-expanded={showChatMore}
-                  title="Más opciones"
-                >
-                  Más
                 </button>
                 <textarea
                   ref={draftInput}
@@ -521,11 +512,15 @@ export function Messages({ connections, selectedId, setSelectedId, messagesByCon
                   {sending ? '…' : '↗'}
                 </button>
               </div>
-              {showChatMore && (
-                <div className="chat-more-menu" role="menu">
-                  <button type="button" role="menuitem" className="chat-more-item" onClick={() => { setShowMeetPicker(true); setShowChatMore(false); }}>
-                    <span className="chat-more-icon">⌁</span>
-                    <span><strong>Crear Google Meet</strong><small>Comparte una reunión para una sesión futura</small></span>
+              {showAttachmentMenu && (
+                <div className="attachment-menu" role="menu">
+                  <button type="button" role="menuitem" className="attachment-menu-item" onClick={() => { setShowAttachmentMenu(false); fileInput.current?.click(); }}>
+                    <strong>Fotos y archivos</strong>
+                    <small>Comparte una imagen o documento</small>
+                  </button>
+                  <button type="button" role="menuitem" className="attachment-menu-item" onClick={() => { setShowMeetPicker(true); setShowAttachmentMenu(false); }}>
+                    <strong>Crear reunión con Google Meet</strong>
+                    <small>Genera y envía el enlace en este chat</small>
                   </button>
                 </div>
               )}

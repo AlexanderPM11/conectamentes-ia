@@ -734,6 +734,16 @@
   .composer-row .chat-more-button { width: 50px; min-width: 50px; }
 }
 
+/* The plus button owns the attachment and Meet actions in one compact menu. */
+.composer-row { grid-template-columns: 45px minmax(0, 1fr) 45px; }
+.attach-button[aria-expanded="true"] { border-color: var(--sage-2); background: var(--sage); transform: rotate(45deg); }
+.attachment-menu { position: relative; z-index: 4; display: grid; gap: 5px; width: min(100%, 330px); margin: 8px 0 0; padding: 7px; border: 1px solid var(--line); border-radius: 16px; background: var(--paper); box-shadow: 0 14px 32px rgba(23,59,53,.14); animation: chat-more-in .18s ease both; }
+.attachment-menu-item { display: grid; gap: 3px; width: 100%; padding: 10px; border: 0; border-radius: 12px; color: var(--ink); background: transparent; text-align: left; cursor: pointer; }
+.attachment-menu-item:hover { background: var(--sage); }
+.attachment-menu-item strong { font-size: .76rem; }
+.attachment-menu-item small { color: var(--muted); font-size: .62rem; }
+@media(max-width:430px) { .composer-row { grid-template-columns: 43px minmax(0, 1fr) 43px; } .attachment-menu { width: 100%; } }
+
 .connection-requests-panel { display: grid; gap: 18px; margin: 0 0 28px; background: linear-gradient(145deg, #fffdf8, #f2f5ee); }
 .connection-requests-panel .section-heading { margin: 0; }
 .connection-requests-intro { margin: -8px 0 0; color: var(--muted); font-size: .84rem; line-height: 1.5; }
