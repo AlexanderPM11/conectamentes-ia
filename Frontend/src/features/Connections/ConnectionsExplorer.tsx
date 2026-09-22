@@ -3,6 +3,7 @@ import { api } from '../../shared/api/client';
 import { initials } from '../../utils/string';
 import { ScreenIntro, Icon, IsoBadge, EmptyState, ProfileAvatar, ConfirmDialog } from '../../components';
 import { UserProfileView } from './UserProfileView';
+import { connectionStatus } from './ConnectionStatusPanel';
 
 export function ConnectionsExplorer({ matches, requestId, notify, onRequestTopic, onOpenChat, connections, onRefreshConnections }: any) {
   const [query, setQuery] = useState('');
@@ -86,19 +87,11 @@ export function ConnectionsExplorer({ matches, requestId, notify, onRequestTopic
   );
 }
 
-function connectionStatus(status: any) {
-  if (status === 0 || status === 'PendienteColaborador') return 'pendiente';
-  if (status === 1 || status === 'Activa') return 'activa';
-  if (status === 2 || status === 'Rechazada') return 'rechazada';
-  return 'cancelada';
-}
-
 function ConnectionRequestsPanel({ connections = [], notify, onOpenChat, onRefresh }: any) {
   const [pendingAction, setPendingAction] = useState<any | null>(null);
   const pending = connections.filter((item: any) => connectionStatus(item.status) === 'pendiente');
   const incoming = pending.filter((item: any) => item.requiresMyResponse);
   const outgoing = pending.filter((item: any) => item.isRequester);
-  const history = connections.filter((item: any) => ['rechazada', 'cancelada'].includes(connectionStatus(item.status)));
 
   async function respond(item: any, accept: boolean) {
     try {
@@ -122,7 +115,7 @@ function ConnectionRequestsPanel({ connections = [], notify, onOpenChat, onRefre
     }
   }
 
-  if (!connections.length) return null;
+  if (!pending.length) return null;
 
   return <>
     <section className="connection-requests-panel surface-card">
@@ -153,12 +146,6 @@ function ConnectionRequestsPanel({ connections = [], notify, onOpenChat, onRefre
         </RequestGroup>
       </div>
 
-      {connections.filter((item: any) => connectionStatus(item.status) === 'activa').length > 0 && <div className="connection-active-list">
-        <div className="connection-subheading"><strong>Conexiones activas</strong><span>Ambos aceptaron</span></div>
-        {connections.filter((item: any) => connectionStatus(item.status) === 'activa').map((item: any) => <div className="connection-active-row" key={item.id}><ProfileAvatar userId={item.counterpartId} name={item.counterpart} version={item.counterpartAvatarUpdatedAt} className="connection-request-avatar" /><div><strong>{item.counterpart}</strong><small>{item.topic || 'Conexión directa'} · Chat disponible</small></div><div className="connection-request-actions"><button className="button button-primary small" onClick={() => onOpenChat(item.id)}>Conversar</button><button className="button button-ghost small" onClick={() => setPendingAction({ type: 'cancel', item })}>Cerrar conexión</button></div></div>)}
-      </div>}
-
-      {history.length > 0 && <details className="connection-history"><summary>Ver solicitudes cerradas ({history.length})</summary><div>{history.map((item: any) => <p key={item.id}><strong>{item.counterpart}</strong><span>{connectionStatus(item.status) === 'rechazada' ? 'Rechazada' : 'Cancelada'}</span></p>)}</div></details>}
     </section>
     {pendingAction && <ConfirmDialog title={pendingAction.type === 'cancel' ? '¿Cancelar esta solicitud?' : '¿Rechazar esta solicitud?'} message={pendingAction.type === 'cancel' ? `La solicitud a ${pendingAction.item.counterpart} se cerrará y no podrá abrirse un chat mientras no exista una nueva conexión.` : `La solicitud de ${pendingAction.item.counterpart} se rechazará y no tendrá acceso a una conversación contigo.`} confirmLabel={pendingAction.type === 'cancel' ? 'Cancelar solicitud' : 'Rechazar solicitud'} onConfirm={() => pendingAction.type === 'cancel' ? cancel(pendingAction.item) : respond(pendingAction.item, false).then(() => setPendingAction(null))} onCancel={() => setPendingAction(null)} />}
   </>;

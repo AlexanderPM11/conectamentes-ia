@@ -1,6 +1,7 @@
 import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import { API, api } from '../../shared/api/client';
 import { ScreenIntro, CardHeading, IsoBadge, EmptyState, ConfirmDialog, ReputationSummary, ProfileAvatar } from '../../components';
+import { ConnectionStatusPanel } from '../Connections/ConnectionStatusPanel';
 
 function getSkillConfidenceLabel(confidence: number) {
   switch (Number(confidence)) {
@@ -13,7 +14,7 @@ function getSkillConfidenceLabel(confidence: number) {
   }
 }
 
-export function Profile({ profile, setProfile, notify, userId, user, setMe, onOpenRanking }: any) {
+export function Profile({ profile, setProfile, notify, userId, user, setMe, onOpenRanking, connections, onOpenChat, onRefreshConnections }: any) {
   const [skill, setSkill] = useState({ topic: '', type: 'Domina', confidence: 4, visible: true });
   const [details, setDetails] = useState({ displayName: user?.displayName ?? '', career: user?.career ?? '', academicTerm: user?.academicTerm ?? '' });
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -130,6 +131,7 @@ export function Profile({ profile, setProfile, notify, userId, user, setMe, onOp
         </div>
         <button type="button" className="button button-secondary small profile-ranking-action" onClick={onOpenRanking}>Ver top 10</button>
       </section>
+      <ConnectionStatusPanel connections={connections} notify={notify} onOpenChat={onOpenChat} onRefresh={onRefreshConnections} onlyResolved />
       
       <section className="profile-editor surface-card">
         <div className="profile-editor-visual">
