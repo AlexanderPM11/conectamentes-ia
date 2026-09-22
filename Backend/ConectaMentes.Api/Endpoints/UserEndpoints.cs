@@ -27,17 +27,26 @@ public static class UserEndpoints
         users.MapGet("/{id:guid}/avatar", async (Guid id, ClaimsPrincipal principal, [FromServices] ConectaMentesDbContext db, [FromServices] ProfileAvatarStorage avatars, CancellationToken ct) =>
         {
             var user = await db.Users.SingleOrDefaultAsync(item => item.Id == id, ct);
-            if (user?.AvatarPath is null) return Results.NotFound();
+            if (user is null || !user.AccessStatus.Equals("active", StringComparison.OrdinalIgnoreCase) || user.AvatarPath is null) return Results.NotFound();
             var path = avatars.Resolve(user.AvatarPath);
             return File.Exists(path) ? Results.File(path, GetAvatarContentType(user.AvatarPath)) : Results.NotFound();
         }).RequireAuthorization().WithName("GetUserAvatar").WithOpenApi();
 
-        users.MapGet("/conectados", ([FromServices] IUserTracker tracker) => Results.Ok(tracker.GetOnlineUsers())).RequireAuthorization().WithName("GetOnlineUsers").WithOpenApi();
+        users.MapGet("/conectados", async ([FromServices] IUserTracker tracker, [FromServices] ConectaMentesDbContext db, CancellationToken ct) =>
+        {
+            var onlineIds = tracker.GetOnlineUsers().ToArray();
+            var activeIds = await db.Users
+                .Where(user => onlineIds.Contains(user.Id) && user.AccessStatus == "active")
+                .Select(user => user.Id)
+                .ToListAsync(ct);
+            return Results.Ok(activeIds);
+        }).RequireAuthorization().WithName("GetOnlineUsers").WithOpenApi();
 
         users.MapGet("/{id:guid}/perfil", async (Guid id, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db, CancellationToken ct) =>
         {
             var user = await db.Users.SingleOrDefaultAsync(item => item.Id == id, ct);
-            if (user is null) return Results.NotFound();
+            var viewerId = ApiIdentity.UserId(p);
+            if (user is null || !user.AccessStatus.Equals("active", StringComparison.OrdinalIgnoreCase) || !await db.Users.AnyAsync(item => item.Id == viewerId && item.AccessStatus == "active", ct)) return Results.NotFound();
 
             var skills = await db.SkillProfiles.Where(s => s.UserId == id && s.Visible).ToListAsync(ct);
             var availability = await db.Availabilities.SingleOrDefaultAsync(a => a.UserId == id, ct);
@@ -47,7 +56,6 @@ public static class UserEndpoints
             var ratingAverage = ratings.Count > 0 
                 ? ratings.Average(r => (r.Usefulness + r.Respect + r.Fulfillment + r.Clarity) / 4.0) 
                 : 0.0;
-            var viewerId = ApiIdentity.UserId(p);
             var activeConnection = await db.Connections
                 .Where(connection => connection.Status == ConnectionStatus.Activa &&
                     ((connection.RequesterId == viewerId && connection.CollaboratorId == id) ||

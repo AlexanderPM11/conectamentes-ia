@@ -22,7 +22,9 @@ public static class ConnectionEndpoints
         {
             var userId = ApiIdentity.UserId(p);
             return Results.Ok(await db.Connections
-                .Where(x => x.RequesterId == userId || x.CollaboratorId == userId)
+                .Where(x => (x.RequesterId == userId || x.CollaboratorId == userId)
+                    && db.Users.Any(user => user.Id == userId && user.AccessStatus == "active")
+                    && db.Users.Any(user => user.Id == (x.RequesterId == userId ? x.CollaboratorId : x.RequesterId) && user.AccessStatus == "active"))
                 .Select(x => new
                 {
                     x.Id,
@@ -42,6 +44,7 @@ public static class ConnectionEndpoints
             var userId = ApiIdentity.UserId(p);
             var request = await db.SupportRequests.SingleOrDefaultAsync(x => x.Id == requestId);
             if (request is null) return Results.NotFound();
+            if (!await db.Users.AnyAsync(x => x.Id == userId && x.AccessStatus == "active") || !await db.Users.AnyAsync(x => x.Id == request.UserId && x.AccessStatus == "active")) return Results.NotFound();
             if (request.UserId == userId) return Results.BadRequest("No puedes ofrecer apoyo a tu propia solicitud.");
             var existing = await db.Connections.SingleOrDefaultAsync(x => x.RequestId == requestId && x.RequesterId == request.UserId && x.CollaboratorId == userId && (x.Status == ConnectionStatus.PendienteColaborador || x.Status == ConnectionStatus.Activa));
             if (existing is not null) return Results.Ok(existing);
@@ -60,7 +63,7 @@ public static class ConnectionEndpoints
             var userId = ApiIdentity.UserId(p);
             if (userId == targetUserId) return Results.BadRequest("No puedes conectar contigo mismo.");
             var target = await db.Users.SingleOrDefaultAsync(x => x.Id == targetUserId);
-            if (target is null) return Results.NotFound();
+            if (target is null || !target.AccessStatus.Equals("active", StringComparison.OrdinalIgnoreCase) || !await db.Users.AnyAsync(x => x.Id == userId && x.AccessStatus == "active")) return Results.NotFound();
             
             var existing = await db.Connections.SingleOrDefaultAsync(x => x.RequestId == null && (x.Status == ConnectionStatus.PendienteColaborador || x.Status == ConnectionStatus.Activa) && ((x.RequesterId == userId && x.CollaboratorId == targetUserId) || (x.CollaboratorId == userId && x.RequesterId == targetUserId)));
             if (existing is not null) return Results.Ok(existing);
@@ -78,7 +81,7 @@ public static class ConnectionEndpoints
         connections.MapGet("/{id:guid}/solicitante", async (Guid id, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db, CancellationToken ct) =>
         {
             var userId = ApiIdentity.UserId(p);
-            var connection = await db.Connections.SingleOrDefaultAsync(item => item.Id == id && item.CollaboratorId == userId && item.Status == ConnectionStatus.PendienteColaborador, ct);
+            var connection = await db.Connections.SingleOrDefaultAsync(item => item.Id == id && item.CollaboratorId == userId && item.Status == ConnectionStatus.PendienteColaborador && db.Users.Any(user => user.Id == item.RequesterId && user.AccessStatus == "active") && db.Users.Any(user => user.Id == userId && user.AccessStatus == "active"), ct);
             if (connection is null) return Results.NotFound();
             var requester = await db.Users.SingleOrDefaultAsync(item => item.Id == connection.RequesterId, ct);
             var request = connection.RequestId != null ? await db.SupportRequests.SingleOrDefaultAsync(item => item.Id == connection.RequestId, ct) : null;
@@ -101,7 +104,7 @@ public static class ConnectionEndpoints
         connections.MapPost("/{id:guid}/cancelar", async (Guid id, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db, [FromServices] IHubContext<RealtimeHub> hub, [FromServices] DevicePushService devicePush) =>
         {
             var userId = ApiIdentity.UserId(p);
-            var item = await db.Connections.SingleOrDefaultAsync(x => x.Id == id && (x.RequesterId == userId || x.CollaboratorId == userId) && (x.Status == ConnectionStatus.PendienteColaborador || x.Status == ConnectionStatus.Activa));
+            var item = await db.Connections.SingleOrDefaultAsync(x => x.Id == id && (x.RequesterId == userId || x.CollaboratorId == userId) && (x.Status == ConnectionStatus.PendienteColaborador || x.Status == ConnectionStatus.Activa) && db.Users.Any(user => user.Id == userId && user.AccessStatus == "active") && db.Users.Any(user => user.Id == (x.RequesterId == userId ? x.CollaboratorId : x.RequesterId) && user.AccessStatus == "active"));
             if (item is null) return Results.NotFound();
             item.Status = ConnectionStatus.Cancelada;
             var requesterName = await db.Users.Where(x => x.Id == userId).Select(x => x.DisplayName).SingleAsync();
@@ -117,7 +120,7 @@ public static class ConnectionEndpoints
         connections.MapPost("/{id:guid}/responder", async (Guid id, [FromBody] ConnectionResponse input, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db, [FromServices] IHubContext<RealtimeHub> hub, [FromServices] DevicePushService devicePush) =>
         {
             var userId = ApiIdentity.UserId(p);
-            var item = await db.Connections.SingleOrDefaultAsync(x => x.Id == id && x.CollaboratorId == userId && x.Status == ConnectionStatus.PendienteColaborador);
+            var item = await db.Connections.SingleOrDefaultAsync(x => x.Id == id && x.CollaboratorId == userId && x.Status == ConnectionStatus.PendienteColaborador && db.Users.Any(user => user.Id == x.RequesterId && user.AccessStatus == "active") && db.Users.Any(user => user.Id == userId && user.AccessStatus == "active"));
             if (item is null) return Results.NotFound();
             item.Status = input.Accept ? ConnectionStatus.Activa : ConnectionStatus.Rechazada;
             var collaboratorName = await db.Users.Where(x => x.Id == userId).Select(x => x.DisplayName).SingleAsync();
@@ -132,7 +135,7 @@ public static class ConnectionEndpoints
         connections.MapPost("/{id:guid}/google-meet", async (Guid id, [FromBody] GoogleMeetRequest input, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db, [FromServices] GoogleCalendarService calendar, [FromServices] IHubContext<RealtimeHub> hub, [FromServices] DevicePushService devicePush, CancellationToken ct) =>
         {
             var userId = ApiIdentity.UserId(p);
-            var connection = await db.Connections.SingleOrDefaultAsync(item => item.Id == id && item.Status == ConnectionStatus.Activa && (item.RequesterId == userId || item.CollaboratorId == userId), ct);
+            var connection = await db.Connections.SingleOrDefaultAsync(item => item.Id == id && item.Status == ConnectionStatus.Activa && (item.RequesterId == userId || item.CollaboratorId == userId) && db.Users.Any(user => user.Id == userId && user.AccessStatus == "active") && db.Users.Any(user => user.Id == (item.RequesterId == userId ? item.CollaboratorId : item.RequesterId) && user.AccessStatus == "active"), ct);
             if (connection is null) return Results.NotFound();
 
             var participants = await db.Users
@@ -176,7 +179,7 @@ public static class ConnectionEndpoints
         {
             if (SessionHelpers.ValidateSessionInput(input) is { } validationError) return validationError;
             var userId = ApiIdentity.UserId(p);
-            var connection = await db.Connections.SingleOrDefaultAsync(x => x.Id == id && (x.RequesterId == userId || x.CollaboratorId == userId) && x.Status == ConnectionStatus.Activa);
+            var connection = await db.Connections.SingleOrDefaultAsync(x => x.Id == id && (x.RequesterId == userId || x.CollaboratorId == userId) && x.Status == ConnectionStatus.Activa && db.Users.Any(user => user.Id == userId && user.AccessStatus == "active") && db.Users.Any(user => user.Id == (x.RequesterId == userId ? x.CollaboratorId : x.RequesterId) && user.AccessStatus == "active"));
             if (connection is null) return Results.NotFound();
             var session = new LearningSession { ConnectionId = id, Date = input.Date, DurationMinutes = input.DurationMinutes, Mode = input.Mode, Objective = input.Objective, Guide = $"Objetivo: {input.Objective}.\nEjercicio inicial: identificar la duda principal.\nComprobación final: explicar el concepto con tus palabras." };
             var senderName = await db.Users.Where(x => x.Id == userId).Select(x => x.DisplayName).SingleAsync();

@@ -17,6 +17,7 @@ public static class DiscoveryEndpoints
         endpoints.MapGet("/api/descubrimiento", async (string? topic, string? type, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db) =>
         {
             var userId = ApiIdentity.UserId(p);
+            if (!await db.Users.AnyAsync(user => user.Id == userId && user.AccessStatus == "active")) return Results.Ok(Array.Empty<object>());
             var blocked = await db.Blocks.Where(x => x.UserId == userId || x.BlockedUserId == userId).Select(x => x.UserId == userId ? x.BlockedUserId : x.UserId).ToListAsync();
             var normalizedTopic = topic?.Trim().ToLower();
             var normalizedType = type?.Trim();
@@ -27,7 +28,7 @@ public static class DiscoveryEndpoints
                 _ => (SkillType?)null
             };
             var query = from user in db.Users
-                        where user.Id != userId && !blocked.Contains(user.Id) && !user.Roles.Contains("admin")
+                        where user.Id != userId && user.AccessStatus == "active" && !blocked.Contains(user.Id) && !user.Roles.Contains("admin")
                         let topSkill = db.SkillProfiles.Where(s => s.UserId == user.Id && s.Visible && (requestedType == null || s.Type == requestedType)).OrderByDescending(s => s.Confidence).FirstOrDefault()
                         select new
                         {
@@ -48,6 +49,7 @@ public static class DiscoveryEndpoints
         endpoints.MapGet("/api/descubrimiento/necesito-apoyo", async (ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db) =>
         {
             var userId = ApiIdentity.UserId(p);
+            if (!await db.Users.AnyAsync(user => user.Id == userId && user.AccessStatus == "active")) return Results.Ok(Array.Empty<object>());
             var requests = await db.SupportRequests
                 .Where(request => request.UserId == userId && request.Status != RequestStatus.Cancelada)
                 .Select(request => new { request.Topic, request.Description })
@@ -60,7 +62,7 @@ public static class DiscoveryEndpoints
                 .Select(block => block.UserId == userId ? block.BlockedUserId : block.UserId)
                 .ToListAsync();
             var users = await db.Users
-                .Where(user => user.Id != userId && !blocked.Contains(user.Id) && !user.Roles.Contains("admin"))
+                .Where(user => user.Id != userId && user.AccessStatus == "active" && !blocked.Contains(user.Id) && !user.Roles.Contains("admin"))
                 .Select(user => new { user.Id, user.DisplayName, user.Career })
                 .ToListAsync();
             var skills = await db.SkillProfiles

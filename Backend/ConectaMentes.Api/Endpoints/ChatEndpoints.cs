@@ -21,7 +21,7 @@ public static class ChatEndpoints
         chat.MapGet("/mensajes", async (Guid id, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db) =>
         {
             var userId = ApiIdentity.UserId(p);
-            if (!await db.Connections.AnyAsync(x => x.Id == id && x.Status == ConnectionStatus.Activa && (x.RequesterId == userId || x.CollaboratorId == userId))) return Results.NotFound();
+            if (!await db.Connections.AnyAsync(x => x.Id == id && x.Status == ConnectionStatus.Activa && (x.RequesterId == userId || x.CollaboratorId == userId) && db.Users.Any(user => user.Id == userId && user.AccessStatus == "active") && db.Users.Any(user => user.Id == (x.RequesterId == userId ? x.CollaboratorId : x.RequesterId) && user.AccessStatus == "active"))) return Results.NotFound();
             var rows = await (from message in db.ChatMessages join sender in db.Users on message.SenderId equals sender.Id where message.ConnectionId == id orderby message.CreatedAt descending select new { Message = message, Sender = sender.DisplayName }).Take(100).ToListAsync();
             rows.Reverse();
             var messageIds = rows.Select(row => row.Message.Id).ToList();
@@ -32,7 +32,7 @@ public static class ChatEndpoints
         chat.MapPost("/mensajes", async (Guid id, [FromBody] ChatMessageInput input, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db, [FromServices] IHubContext<RealtimeHub> hub, [FromServices] DevicePushService devicePush) =>
         {
             var userId = ApiIdentity.UserId(p);
-            var connection = await db.Connections.SingleOrDefaultAsync(x => x.Id == id && (x.RequesterId == userId || x.CollaboratorId == userId) && x.Status == ConnectionStatus.Activa);
+            var connection = await db.Connections.SingleOrDefaultAsync(x => x.Id == id && (x.RequesterId == userId || x.CollaboratorId == userId) && x.Status == ConnectionStatus.Activa && db.Users.Any(user => user.Id == userId && user.AccessStatus == "active") && db.Users.Any(user => user.Id == (x.RequesterId == userId ? x.CollaboratorId : x.RequesterId) && user.AccessStatus == "active"));
             if (connection is null) return Results.NotFound();
             var text = input.Text.Trim();
             if (text.Length is 0 or > 1500) return Results.ValidationProblem(new Dictionary<string, string[]> { ["text"] = ["El mensaje debe tener entre 1 y 1500 caracteres."] });
@@ -56,6 +56,9 @@ public static class ChatEndpoints
                                  join connection in db.Connections on item.ConnectionId equals connection.Id
                                  where item.Id == messageId && item.ConnectionId == id && item.SenderId == userId
                                        && (connection.RequesterId == userId || connection.CollaboratorId == userId)
+                                       && connection.Status == ConnectionStatus.Activa
+                                       && db.Users.Any(user => user.Id == userId && user.AccessStatus == "active")
+                                       && db.Users.Any(user => user.Id == (connection.RequesterId == userId ? connection.CollaboratorId : connection.RequesterId) && user.AccessStatus == "active")
                                  select item).SingleOrDefaultAsync(ct);
             if (message is null) return Results.NotFound();
 
@@ -74,7 +77,7 @@ public static class ChatEndpoints
         chat.MapPost("/adjuntos", async (Guid id, HttpRequest request, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db, [FromServices] ChatAttachmentStorage storage, [FromServices] IHubContext<RealtimeHub> hub, [FromServices] DevicePushService devicePush, CancellationToken ct) =>
         {
             var userId = ApiIdentity.UserId(p);
-            var connection = await db.Connections.SingleOrDefaultAsync(x => x.Id == id && (x.RequesterId == userId || x.CollaboratorId == userId) && x.Status == ConnectionStatus.Activa, ct);
+            var connection = await db.Connections.SingleOrDefaultAsync(x => x.Id == id && (x.RequesterId == userId || x.CollaboratorId == userId) && x.Status == ConnectionStatus.Activa && db.Users.Any(user => user.Id == userId && user.AccessStatus == "active") && db.Users.Any(user => user.Id == (x.RequesterId == userId ? x.CollaboratorId : x.RequesterId) && user.AccessStatus == "active"), ct);
             if (connection is null) return Results.NotFound();
             if (!request.HasFormContentType) return Results.ValidationProblem(new Dictionary<string, string[]> { ["file"] = ["Selecciona un archivo válido."] });
             var form = await request.ReadFormAsync(ct);
@@ -108,7 +111,7 @@ public static class ChatEndpoints
         endpoints.MapGet("/api/adjuntos/{id:guid}", async (Guid id, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db, [FromServices] ChatAttachmentStorage storage, CancellationToken ct) =>
         {
             var userId = ApiIdentity.UserId(p);
-            var attachment = await (from item in db.ChatAttachments join connection in db.Connections on item.ConnectionId equals connection.Id where item.Id == id && (connection.RequesterId == userId || connection.CollaboratorId == userId) select item).SingleOrDefaultAsync(ct);
+            var attachment = await (from item in db.ChatAttachments join connection in db.Connections on item.ConnectionId equals connection.Id where item.Id == id && connection.Status == ConnectionStatus.Activa && (connection.RequesterId == userId || connection.CollaboratorId == userId) && db.Users.Any(user => user.Id == userId && user.AccessStatus == "active") && db.Users.Any(user => user.Id == (connection.RequesterId == userId ? connection.CollaboratorId : connection.RequesterId) && user.AccessStatus == "active") select item).SingleOrDefaultAsync(ct);
             if (attachment is null) return Results.NotFound();
             var path = storage.Resolve(attachment.StoredName);
             return File.Exists(path) ? Results.File(File.OpenRead(path), attachment.ContentType, enableRangeProcessing: true) : Results.NotFound();

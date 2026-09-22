@@ -23,7 +23,9 @@ public static class SessionEndpoints
             var userId = ApiIdentity.UserId(p);
             return Results.Ok(await (from session in db.Sessions
                 join connection in db.Connections on session.ConnectionId equals connection.Id
-                where connection.RequesterId == userId || connection.CollaboratorId == userId
+                where (connection.RequesterId == userId || connection.CollaboratorId == userId) &&
+                      db.Users.Any(user => user.Id == userId && user.AccessStatus == "active") &&
+                      db.Users.Any(user => user.Id == (connection.RequesterId == userId ? connection.CollaboratorId : connection.RequesterId) && user.AccessStatus == "active")
                 orderby session.Date
                 select new
                 {
@@ -59,7 +61,9 @@ public static class SessionEndpoints
             var item = await (from session in db.Sessions
                               join connection in db.Connections on session.ConnectionId equals connection.Id
                               join request in db.SupportRequests on connection.RequestId equals request.Id
-                              where session.Id == id
+                              where session.Id == id &&
+                                    db.Users.Any(user => user.Id == userId && user.AccessStatus == "active") &&
+                                    db.Users.Any(user => user.Id == (connection.RequesterId == userId ? connection.CollaboratorId : connection.RequesterId) && user.AccessStatus == "active")
                               select new { Session = session, Connection = connection, Topic = request.Topic }).SingleOrDefaultAsync(ct);
             if (item is null) return Results.NotFound();
             if (item.Connection.RequesterId != userId && item.Connection.CollaboratorId != userId) return Results.Forbid();
@@ -104,7 +108,7 @@ public static class SessionEndpoints
     { 
         if (SessionHelpers.ValidateSessionInput(input) is { } validationError) return validationError; 
         var userId = ApiIdentity.UserId(p); 
-        var match = await (from session in db.Sessions join connection in db.Connections on session.ConnectionId equals connection.Id where session.Id == id select new { Session = session, Connection = connection }).SingleOrDefaultAsync(); 
+        var match = await (from session in db.Sessions join connection in db.Connections on session.ConnectionId equals connection.Id where session.Id == id && db.Users.Any(user => user.Id == userId && user.AccessStatus == "active") && db.Users.Any(user => user.Id == (connection.RequesterId == userId ? connection.CollaboratorId : connection.RequesterId) && user.AccessStatus == "active") select new { Session = session, Connection = connection }).SingleOrDefaultAsync();
         if (match is null) return Results.NotFound(); 
         if (match.Connection.RequesterId != userId && match.Connection.CollaboratorId != userId) return Results.Forbid(); 
         if (match.Session.Status != SessionStatus.Agendada) return Results.Conflict(new { message = "Solo puedes editar sesiones agendadas." }); 
@@ -123,7 +127,7 @@ public static class SessionEndpoints
     private static async Task<IResult> DeleteSession(Guid id, ClaimsPrincipal p, ConectaMentesDbContext db) 
     { 
         var userId = ApiIdentity.UserId(p); 
-        var match = await (from session in db.Sessions join connection in db.Connections on session.ConnectionId equals connection.Id where session.Id == id select new { Session = session, Connection = connection }).SingleOrDefaultAsync(); 
+        var match = await (from session in db.Sessions join connection in db.Connections on session.ConnectionId equals connection.Id where session.Id == id && db.Users.Any(user => user.Id == userId && user.AccessStatus == "active") && db.Users.Any(user => user.Id == (connection.RequesterId == userId ? connection.CollaboratorId : connection.RequesterId) && user.AccessStatus == "active") select new { Session = session, Connection = connection }).SingleOrDefaultAsync();
         if (match is null) return Results.NotFound(); 
         if (match.Connection.RequesterId != userId && match.Connection.CollaboratorId != userId) return Results.Forbid(); 
         if (match.Session.Status != SessionStatus.Agendada) return Results.Conflict(new { message = "Solo puedes eliminar sesiones agendadas." }); 
@@ -135,7 +139,7 @@ public static class SessionEndpoints
     private static async Task<IResult> SetSessionStatus(Guid id, SessionStatus status, ClaimsPrincipal p, ConectaMentesDbContext db) 
     { 
         var userId = ApiIdentity.UserId(p); 
-        var match = await (from session in db.Sessions join connection in db.Connections on session.ConnectionId equals connection.Id where session.Id == id select new { Session = session, Connection = connection }).SingleOrDefaultAsync(); 
+        var match = await (from session in db.Sessions join connection in db.Connections on session.ConnectionId equals connection.Id where session.Id == id && db.Users.Any(user => user.Id == userId && user.AccessStatus == "active") && db.Users.Any(user => user.Id == (connection.RequesterId == userId ? connection.CollaboratorId : connection.RequesterId) && user.AccessStatus == "active") select new { Session = session, Connection = connection }).SingleOrDefaultAsync();
         if (match is null) return Results.NotFound(); 
         if (match.Connection.RequesterId != userId && match.Connection.CollaboratorId != userId) return Results.Forbid(); 
         if (match.Session.Status != SessionStatus.Agendada) return Results.Conflict(new { message = "La sesión ya no está agendada." }); 
