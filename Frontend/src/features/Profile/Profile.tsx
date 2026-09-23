@@ -123,13 +123,13 @@ export function Profile({ profile, setProfile, notify, userId, user, setMe, onOp
         <div className="profile-ranking-copy">
           <p className="eyebrow">MI POSICIÓN</p>
           <h2>Tu lugar en la comunidad</h2>
-          <p>{ranking?.position ? `Estás en el puesto ${ranking.position} entre ${ranking.totalParticipants} colaboradores con valoraciones.` : 'Completa una orientación y recibe valoraciones para aparecer en el ranking.'}</p>
+          <p>{ranking?.position ? `Estás en el puesto ${ranking.position} entre ${ranking.totalParticipants} perfiles de la comunidad.${ranking.item?.totalRatings ? '' : ' Aún no has recibido valoraciones.'}` : 'Tu posición aparecerá cuando tu perfil esté activo en la comunidad.'}</p>
         </div>
         <div className="profile-ranking-score" aria-label={ranking?.position ? `Puesto ${ranking.position}` : 'Sin puesto todavía'}>
           <span>{ranking?.position ? `#${ranking.position}` : '—'}</span>
-          <small>{ranking?.item ? `${Number(ranking.item.average).toFixed(1)} promedio` : 'Sin valoraciones'}</small>
+          <small>{ranking?.item?.totalRatings ? `${Number(ranking.item.average).toFixed(1)} promedio` : 'Sin valoraciones'}</small>
         </div>
-        <button type="button" className="button button-secondary small profile-ranking-action" onClick={onOpenRanking}>Ver top 10</button>
+        <button type="button" className="button button-secondary small profile-ranking-action" onClick={onOpenRanking}>Ver clasificación</button>
       </section>
       <ConnectionStatusPanel connections={connections} notify={notify} onOpenChat={onOpenChat} onRefresh={onRefreshConnections} onlyResolved />
       
