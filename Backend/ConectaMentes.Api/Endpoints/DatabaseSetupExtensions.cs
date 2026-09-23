@@ -81,6 +81,19 @@ public static class DatabaseSetupExtensions
             );
             """);
 
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS `ReportEvidences` (
+              `Id` char(36) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,
+              `ReportId` char(36) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL,
+              `FileName` varchar(180) NOT NULL,
+              `StoredName` varchar(260) NOT NULL,
+              `ContentType` varchar(120) NOT NULL,
+              `SizeBytes` bigint NOT NULL,
+              `CreatedAt` datetime(6) NOT NULL,
+              PRIMARY KEY (`Id`), INDEX `IX_ReportEvidences_ReportId` (`ReportId`)
+            );
+            """);
+
         await EnsureColumnAsync(db, "Sessions", "MeetUrl");
         await EnsureColumnAsync(db, "Sessions", "GoogleCalendarEventId");
         await EnsureColumnAsync(db, "Users", "AccessStatus");

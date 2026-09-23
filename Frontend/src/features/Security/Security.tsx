@@ -4,16 +4,23 @@ import { ScreenIntro, IsoBadge, EmptyState } from '../../components';
 
 export function Security({ connections, notify }: any) {
   const [form, setForm] = useState({ reportedUserId: '', referenceId: '', reason: '', description: '' });
+  const [evidence, setEvidence] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
   
   async function submit(event: FormEvent) { 
     event.preventDefault(); 
-    try { 
-      await api('/api/reportes', { method: 'POST', body: JSON.stringify(form) }); 
+    try {
+      setSaving(true);
+      const body = new FormData();
+      Object.entries(form).forEach(([key, value]) => body.append(key, value));
+      if (evidence) body.append('evidence', evidence);
+      await api('/api/reportes', { method: 'POST', body });
       setForm({ reportedUserId: '', referenceId: '', reason: '', description: '' }); 
+      setEvidence(null);
       notify('Reporte recibido. Un moderador humano lo revisará.'); 
     } catch (error) { 
       notify(error instanceof Error ? error.message : 'No pudimos enviar el reporte.'); 
-    } 
+    } finally { setSaving(false); }
   }
   
   function chooseConnection(id: string) { 
@@ -52,9 +59,14 @@ export function Security({ connections, notify }: any) {
             <label>Cuéntanos qué ocurrió
               <textarea value={form.description} onChange={event => setForm({ ...form, description: event.target.value })} placeholder="Describe los hechos con el detalle que consideres necesario." required />
             </label>
+            <label className="evidence-picker">Evidencia opcional
+              <span className="evidence-help">Una imagen, captura, PDF o documento que ayude a entender lo ocurrido. Máximo 10 MB.</span>
+              <input type="file" accept="image/*,.pdf,.docx,.xlsx,.pptx,.txt" onChange={event => setEvidence(event.target.files?.[0] ?? null)} />
+              {evidence && <span className="evidence-selected"><strong>{evidence.name}</strong><button type="button" onClick={() => setEvidence(null)} aria-label="Quitar evidencia">×</button></span>}
+            </label>
             <div className="form-footer">
               <p>Solo el equipo de moderación podrá consultar este reporte.</p>
-              <button className="button button-danger">Enviar a revisión humana</button>
+              <button className="button button-danger" disabled={saving}>{saving ? 'Enviando…' : 'Enviar a revisión humana'}</button>
             </div>
           </>
         ) : <EmptyState title="No tienes conexiones que reportar" text="Este espacio se activará cuando hayas conectado con otro estudiante." badge="network" />}

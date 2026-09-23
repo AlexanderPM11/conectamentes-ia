@@ -67,25 +67,61 @@ public static class AdminEndpoints
             return Results.NoContent(); 
         });
         
-        security.MapPost("/reportes", async ([FromBody] ReportInput input, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db) => { 
-            var report = new Report { AuthorId = ApiIdentity.UserId(p), ReportedUserId = input.ReportedUserId, ReferenceId = input.ReferenceId, Reason = input.Reason.Trim(), Description = input.Description.Trim() }; 
-            db.Add(report); 
-            await db.SaveChangesAsync(); 
-            return Results.Created($"/api/reportes/{report.Id}", new { report.Id, message = "Reporte recibido para revisión humana." }); 
+        security.MapPost("/reportes", async (HttpRequest request, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db, [FromServices] ReportEvidenceStorage storage, CancellationToken ct) =>
+        {
+            var form = await request.ReadFormAsync(ct);
+            if (!Guid.TryParse(form["reportedUserId"], out var reportedUserId) || !Guid.TryParse(form["referenceId"], out var referenceId)) return Results.ValidationProblem(new Dictionary<string, string[]> { ["connection"] = ["Selecciona una conexión válida."] });
+            var reason = form["reason"].ToString().Trim();
+            var description = form["description"].ToString().Trim();
+            if (string.IsNullOrWhiteSpace(reason) || string.IsNullOrWhiteSpace(description)) return Results.ValidationProblem(new Dictionary<string, string[]> { ["report"] = ["Indica el motivo y describe lo ocurrido."] });
+            if (reason.Length > 80 || description.Length > 4000) return Results.ValidationProblem(new Dictionary<string, string[]> { ["report"] = ["El motivo o la descripción superan el límite permitido."] });
+            var authorId = ApiIdentity.UserId(p);
+            var validConnection = await db.Connections.AnyAsync(connection => connection.Id == referenceId && connection.Status == ConnectionStatus.Activa && (connection.RequesterId == authorId && connection.CollaboratorId == reportedUserId || connection.CollaboratorId == authorId && connection.RequesterId == reportedUserId), ct);
+            if (!validConnection) return Results.BadRequest(new { message = "Solo puedes reportar a una persona con la que tienes una conexión activa." });
+            var report = new Report { AuthorId = authorId, ReportedUserId = reportedUserId, ReferenceId = referenceId, Reason = reason, Description = description };
+            db.Add(report);
+            var evidenceFile = form.Files.GetFile("evidence");
+            StoredReportEvidence? stored = null;
+            try
+            {
+                if (evidenceFile is not null) { stored = await storage.SaveAsync(evidenceFile, report.Id, ct); db.Add(new ReportEvidence { ReportId = report.Id, FileName = stored.FileName, StoredName = stored.StoredName, ContentType = stored.ContentType, SizeBytes = stored.SizeBytes }); }
+                db.Add(new Notification { UserId = authorId, Type = "report_received", Title = "Reporte recibido", Body = "Tu reporte quedó abierto para revisión humana.", ReferenceId = report.Id });
+                await db.SaveChangesAsync(ct);
+            }
+            catch (ReportFileValidationException error) { return Results.BadRequest(new { message = error.Message }); }
+            return Results.Created($"/api/reportes/{report.Id}", new { report.Id, message = "Reporte recibido para revisión humana." });
+        }).DisableAntiforgery();
+        
+        var moderation = endpoints.MapGroup("/api/moderacion").RequireAuthorization("ModeratorOrSuperAdmin").WithTags("Moderación");
+        
+        moderation.MapGet("/reportes", async ([FromServices] ConectaMentesDbContext db) =>
+        {
+            var reports = await (from report in db.Reports.AsNoTracking()
+                                 join author in db.Users.AsNoTracking() on report.AuthorId equals author.Id
+                                 join reported in db.Users.AsNoTracking() on report.ReportedUserId equals reported.Id
+                                 orderby report.Status == ReportStatus.Abierto descending, report.CreatedAt descending
+                                 select new { report.Id, report.AuthorId, authorName = author.DisplayName, report.ReportedUserId, reportedName = reported.DisplayName, report.ReferenceId, report.Reason, report.Description, report.Status, report.ResolutionNote, report.ModeratorId, report.CreatedAt, evidences = db.ReportEvidences.Where(evidence => evidence.ReportId == report.Id).Select(evidence => new { evidence.Id, evidence.FileName, evidence.ContentType, evidence.SizeBytes, evidence.CreatedAt }).ToList() }).ToListAsync();
+            return Results.Ok(reports);
         });
-        
-        var moderation = endpoints.MapGroup("/api/moderacion").RequireAuthorization("Moderator").WithTags("Moderación");
-        
-        moderation.MapGet("/reportes", async ([FromServices] ConectaMentesDbContext db) => Results.Ok(await db.Reports.OrderBy(x => x.CreatedAt).ToListAsync()));
+
+        moderation.MapGet("/reportes/{reportId:guid}/evidencias/{evidenceId:guid}", async (Guid reportId, Guid evidenceId, [FromServices] ConectaMentesDbContext db, [FromServices] ReportEvidenceStorage storage) =>
+        {
+            var evidence = await db.ReportEvidences.AsNoTracking().SingleOrDefaultAsync(item => item.Id == evidenceId && item.ReportId == reportId);
+            if (evidence is null) return Results.NotFound();
+            var path = storage.Resolve(evidence.StoredName);
+            return File.Exists(path) ? Results.File(File.OpenRead(path), evidence.ContentType, evidence.FileName, enableRangeProcessing: true) : Results.NotFound();
+        });
         
         moderation.MapPut("/reportes/{id:guid}", async (Guid id, [FromBody] ModerationInput input, ClaimsPrincipal p, [FromServices] ConectaMentesDbContext db) => { 
             var report = await db.Reports.FindAsync(id); 
             if (report is null) return Results.NotFound(); 
+            if (input.Status is not (ReportStatus.Abierto or ReportStatus.EnRevision or ReportStatus.Resuelto)) return Results.BadRequest(new { message = "Estado de reporte no válido." });
+            if (input.Status == ReportStatus.Resuelto && string.IsNullOrWhiteSpace(input.ResolutionNote)) return Results.ValidationProblem(new Dictionary<string, string[]> { ["resolutionNote"] = ["Añade una nota de resolución antes de cerrar el reporte."] });
             report.Status = input.Status; 
             report.ResolutionNote = input.ResolutionNote.Trim(); 
             report.ModeratorId = ApiIdentity.UserId(p); 
             await db.SaveChangesAsync(); 
-            return Results.Ok(report); 
+            return Results.Ok(new { report.Id, report.Status, report.ResolutionNote, report.ModeratorId }); 
         });
 
         return endpoints;

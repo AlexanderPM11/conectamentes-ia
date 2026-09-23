@@ -17,6 +17,7 @@ public sealed class ConectaMentesDbContext(DbContextOptions<ConectaMentesDbConte
     public DbSet<Recognition> Recognitions => Set<Recognition>();
     public DbSet<Block> Blocks => Set<Block>();
     public DbSet<Report> Reports => Set<Report>();
+    public DbSet<ReportEvidence> ReportEvidences => Set<ReportEvidence>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<PushSubscriptionRecord> PushSubscriptions => Set<PushSubscriptionRecord>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
@@ -76,6 +77,22 @@ public sealed class ConectaMentesDbContext(DbContextOptions<ConectaMentesDbConte
         {
             entity.Property(item => item.MeetUrl).HasMaxLength(500);
             entity.Property(item => item.GoogleCalendarEventId).HasMaxLength(200);
+        });
+        modelBuilder.Entity<Report>(entity =>
+        {
+            entity.HasKey(item => item.Id);
+            entity.HasIndex(item => new { item.Status, item.CreatedAt });
+            entity.Property(item => item.Reason).HasMaxLength(80).IsRequired();
+            entity.Property(item => item.Description).HasMaxLength(4000).IsRequired();
+            entity.Property(item => item.ResolutionNote).HasMaxLength(2000).IsRequired();
+        });
+        modelBuilder.Entity<ReportEvidence>(entity =>
+        {
+            entity.HasKey(item => item.Id);
+            entity.HasIndex(item => item.ReportId);
+            entity.Property(item => item.FileName).HasMaxLength(180).IsRequired();
+            entity.Property(item => item.StoredName).HasMaxLength(260).IsRequired();
+            entity.Property(item => item.ContentType).HasMaxLength(120).IsRequired();
         });
         modelBuilder.Entity<Rating>(entity =>
         {

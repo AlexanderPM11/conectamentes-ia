@@ -31,6 +31,7 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton<IUserTracker, InMemoryUserTracker>();
 builder.Services.Configure<FormOptions>(options => options.MultipartBodyLengthLimit = ChatAttachmentStorage.DefaultMaxBytes + 512 * 1024);
 builder.Services.AddSingleton<ChatAttachmentStorage>();
+builder.Services.AddSingleton<ReportEvidenceStorage>();
 builder.Services.AddSingleton<ProfileAvatarStorage>();
 builder.Services.AddHttpClient();
 builder.Services.AddHttpClient("GoogleCalendar", client => client.BaseAddress = new Uri("https://www.googleapis.com/"));
@@ -64,6 +65,7 @@ builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("Institutional", policy => policy.RequireRole("coordinator", "moderator"));
     options.AddPolicy("Moderator", policy => policy.RequireRole("moderator"));
+    options.AddPolicy("ModeratorOrSuperAdmin", policy => policy.RequireRole("moderator", "superadmin"));
     options.AddPolicy("SuperAdmin", policy => policy.RequireRole("superadmin"));
 });
 builder.Services.AddCors(options => options.AddPolicy("Frontend", policy => policy.WithOrigins(builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? ["http://localhost:5173"]).AllowAnyHeader().AllowAnyMethod().AllowCredentials()));

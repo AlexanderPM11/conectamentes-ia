@@ -12,6 +12,8 @@ export function AdminPanel({ notify }: { notify: (message: string) => void }) {
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState<{ user: any; status: string } | null>(null);
+  const [reports, setReports] = useState<any[]>([]);
+  const [selectedReport, setSelectedReport] = useState<any | null>(null);
 
   async function refresh() {
     setLoading(true);
@@ -19,9 +21,10 @@ export function AdminPanel({ notify }: { notify: (message: string) => void }) {
       const query = new URLSearchParams();
       if (search.trim()) query.set('search', search.trim());
       if (status) query.set('status', status);
-      const [nextSummary, nextUsers] = await Promise.all([api('/api/admin/resumen'), api('/api/admin/usuarios?' + query.toString())]);
-      setSummary(nextSummary); 
+      const [nextSummary, nextUsers, nextReports] = await Promise.all([api('/api/admin/resumen').catch(() => null), api('/api/admin/usuarios?' + query.toString()).catch(() => []), api('/api/moderacion/reportes')]);
+      setSummary(nextSummary);
       setUsers(nextUsers);
+      setReports(nextReports);
     } catch (error) { 
       notify(error instanceof Error ? error.message : 'No pudimos cargar la administración.'); 
     } finally { 
@@ -63,6 +66,17 @@ export function AdminPanel({ notify }: { notify: (message: string) => void }) {
           </button>
         ))}
       </div>
+      <section className="surface-card reports-card">
+        <div className="section-heading compact">
+          <div><p className="eyebrow">REVISIÓN HUMANA</p><h2>Reportes de la comunidad</h2><p>Lee el contexto y la evidencia antes de decidir si corresponde una intervención.</p></div>
+          <span className="count-badge">{reports.filter(report => report.status === 'Abierto').length}</span>
+        </div>
+        {reports.length ? <div className="report-list">{reports.map(report => <button type="button" className="report-row" key={report.id} onClick={() => setSelectedReport(report)}>
+          <span className={`report-status ${report.status.toLowerCase()}`}>{report.status === 'Abierto' ? 'Abierto' : report.status === 'EnRevision' ? 'En revisión' : 'Resuelto'}</span>
+          <span className="report-row-copy"><strong>{report.reason}</strong><small>{report.reportedName} · enviado por {report.authorName}</small><em>{new Date(report.createdAt).toLocaleDateString('es-ES')}</em></span>
+          <span className="report-evidence-count">{report.evidences?.length ? `📎 ${report.evidences.length}` : '›'}</span>
+        </button>)}</div> : <p className="history-empty">No hay reportes para revisar.</p>}
+      </section>
       <section className="surface-card admin-users-card">
         <div className="section-heading compact">
           <div>
@@ -108,8 +122,24 @@ export function AdminPanel({ notify }: { notify: (message: string) => void }) {
         ) : <EmptyState title="No encontramos cuentas" text="Prueba con otro nombre, correo o filtro." badge="network" />}
       </section>
       {pending && <AdminAccessDialog user={pending.user} status={pending.status} onCancel={() => setPending(null)} onSave={saveStatus} />}
+      {selectedReport && <ReportReviewDialog report={selectedReport} onCancel={() => setSelectedReport(null)} onSaved={async () => { setSelectedReport(null); await refresh(); }} notify={notify} />}
     </section>
   );
+}
+
+function ReportReviewDialog({ report, onCancel, onSaved, notify }: { report: any; onCancel: () => void; onSaved: () => Promise<void>; notify: (message: string) => void }) {
+  const [status, setStatus] = useState(report.status);
+  const [note, setNote] = useState(report.resolutionNote ?? '');
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { const close = (event: KeyboardEvent) => event.key === 'Escape' && !saving && onCancel(); document.addEventListener('keydown', close); return () => document.removeEventListener('keydown', close); }, [onCancel, saving]);
+  async function save(event: FormEvent) { event.preventDefault(); if (status === 'Resuelto' && !note.trim()) return; setSaving(true); try { await api(`/api/moderacion/reportes/${report.id}`, { method: 'PUT', body: JSON.stringify({ status, resolutionNote: note }) }); notify('Estado del reporte actualizado.'); await onSaved(); } catch (error) { notify(error instanceof Error ? error.message : 'No pudimos guardar la revisión.'); } finally { setSaving(false); } }
+  return <div className="custom-dialog-backdrop" role="presentation" onMouseDown={event => event.currentTarget === event.target && !saving && onCancel()}><section className="custom-dialog report-dialog" role="dialog" aria-modal="true" aria-labelledby="report-dialog-title"><div className="custom-dialog-head"><span className="dialog-icon report"><Icon name="shield" /></span><button type="button" className="dialog-close" onClick={onCancel} disabled={saving} aria-label="Cerrar">×</button></div><p className="eyebrow">DETALLE DEL REPORTE</p><h2 id="report-dialog-title">{report.reason}</h2><p><strong>{report.reportedName}</strong> · reportado por {report.authorName}</p><div className="report-detail"><span>Qué ocurrió</span><p>{report.description}</p></div>{report.evidences?.length > 0 && <div className="report-evidence"><span>Evidencia adjunta</span>{report.evidences.map((evidence: any) => <EvidencePreview key={evidence.id} reportId={report.id} evidence={evidence} notify={notify} />)}</div>}<form onSubmit={save}><label>Estado de revisión<select value={status} onChange={event => setStatus(event.target.value)}><option value="Abierto">Abierto</option><option value="EnRevision">En revisión</option><option value="Resuelto">Resuelto</option></select></label><label>Nota de resolución<textarea value={note} onChange={event => setNote(event.target.value)} maxLength={2000} placeholder="Registra la decisión humana y los próximos pasos." /></label><div className="custom-dialog-actions"><button type="button" className="button button-ghost" onClick={onCancel} disabled={saving}>Cancelar</button><button className="button button-primary" disabled={saving || (status === 'Resuelto' && !note.trim())}>{saving ? 'Guardando…' : 'Guardar revisión'}</button></div></form></section></div>;
+}
+
+function EvidencePreview({ reportId, evidence, notify }: { reportId: string; evidence: any; notify: (message: string) => void }) {
+  const [url, setUrl] = useState('');
+  useEffect(() => { const controller = new AbortController(); const token = localStorage.getItem('conectamente_token'); fetch(`/api/moderacion/reportes/${reportId}/evidencias/${evidence.id}`, { headers: token ? { Authorization: `Bearer ${token}` } : {}, signal: controller.signal }).then(response => { if (!response.ok) throw new Error('No pudimos abrir la evidencia.'); return response.blob(); }).then(blob => setUrl(URL.createObjectURL(blob))).catch(error => { if (error.name !== 'AbortError') notify(error.message); }); return () => { controller.abort(); if (url) URL.revokeObjectURL(url); }; }, [reportId, evidence.id]);
+  return <div className="evidence-item">{url && evidence.contentType?.startsWith('image/') ? <img src={url} alt={evidence.fileName} /> : <span className="evidence-file">📎</span>}<span><strong>{evidence.fileName}</strong><small>{Math.ceil(evidence.sizeBytes / 1024)} KB</small></span>{url && <a href={url} target="_blank" rel="noreferrer">Abrir</a>}</div>;
 }
 
 function AdminAccessDialog({ user, status, onCancel, onSave }: { user: any; status: string; onCancel: () => void; onSave: (reason: string) => Promise<void> }) {
