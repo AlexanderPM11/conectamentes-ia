@@ -1,6 +1,6 @@
 export type Mode = 'welcome' | 'login' | 'register' | 'recover';
-export type Tab = 'inicio' | 'perfil' | 'solicitudes' | 'coincidencias' | 'mensajes' | 'ranking' | 'agenda' | 'seguridad' | 'panel' | 'admin';
-export type IconName = 'home' | 'profile' | 'request' | 'match' | 'message' | 'bell' | 'search' | 'calendar' | 'shield' | 'chart' | 'star' | 'more' | 'back';
+export type Tab = 'inicio' | 'perfil' | 'solicitudes' | 'tutor' | 'coincidencias' | 'mensajes' | 'ranking' | 'agenda' | 'seguridad' | 'panel' | 'admin';
+export type IconName = 'home' | 'profile' | 'request' | 'tutor' | 'match' | 'message' | 'bell' | 'search' | 'calendar' | 'shield' | 'chart' | 'star' | 'more' | 'back';
 
 export interface User {
   id: string;

@@ -23,6 +23,7 @@ docente, no resuelve tareas y no toma decisiones sancionatorias.
 | 6 | Valoración de la sesión y reconocimiento | `specs/06-valoraciones-reconocimiento.md` |
 | 7 | Panel administrativo/institucional básico | `specs/07-panel-institucional.md` |
 | 8 | Seguridad, bloqueo y reportes | `specs/08-seguridad-moderacion.md` |
+| 9 | Tutor IA con capa Free/Premium | `specs/09-tutor-ia.md` |
 
 ### 2.2 Explícitamente fuera de alcance (no construir en esta versión)
 
@@ -36,6 +37,9 @@ docente, no resuelve tareas y no toma decisiones sancionatorias.
 - Modelo predictivo avanzado de recomendación con grandes volúmenes de
   datos; el MVP usa reglas de compatibilidad + análisis de texto simple.
 - Mercado de tutorías pagadas.
+- Cobro real de suscripciones Premium en el MVP del Tutor IA; se implementa la
+  frontera de suscripción y prueba Premium, pero el proveedor de pagos requiere
+  credenciales y configuración operativa.
 
 Si el agente detecta que una tarea propuesta cae en esta lista, debe
 detenerse y confirmar antes de implementarla.

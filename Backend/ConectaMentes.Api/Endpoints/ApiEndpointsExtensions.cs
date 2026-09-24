@@ -22,6 +22,7 @@ public static class ApiEndpointsExtensions
         endpoints.MapRankingEndpoints();
         endpoints.MapPanelEndpoints();
         endpoints.MapAdminEndpoints();
+        endpoints.MapTutorEndpoints();
 
         return endpoints;
     }

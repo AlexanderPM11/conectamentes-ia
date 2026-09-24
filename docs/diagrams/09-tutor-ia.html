@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Flujo del Tutor IA</title>
+  <style>
+    :root{--paper:#f4f1ea;--ink:#173b35;--muted:#58716b;--soft:#7a8b85;--rule:#d8d8cf;--accent:#c96d48;--tint:#f4ded3;--white:#fffdf8}
+    *{box-sizing:border-box}body{margin:0;padding:48px 24px;background:var(--paper);color:var(--ink);font-family:DM Sans,system-ui,sans-serif}main{max-width:1120px;margin:auto}p.eyebrow{color:var(--accent);font:600 11px monospace;letter-spacing:.16em}h1{margin:10px 0 8px;font:400 38px Georgia,serif;letter-spacing:-.04em}.lead{max-width:660px;color:var(--muted);line-height:1.55}svg{display:block;width:100%;height:auto;margin-top:30px;background:var(--paper)}.node{fill:var(--white);stroke:var(--ink);stroke-width:1.5}.focal{fill:var(--tint);stroke:var(--accent);stroke-width:2}.store{fill:#e9eee9;stroke:var(--muted);stroke-width:1.2}.decision{fill:#fff8ef;stroke:var(--accent);stroke-width:1.5}.txt{fill:var(--ink);font:600 15px DM Sans,system-ui,sans-serif;text-anchor:middle}.sub{fill:var(--muted);font:12px monospace;text-anchor:middle}.label{fill:var(--paper);font:12px monospace;text-anchor:middle}.line{fill:none;stroke:var(--muted);stroke-width:1.5;marker-end:url(#arrow)}.accent-line{fill:none;stroke:var(--accent);stroke-width:2;marker-end:url(#accent-arrow)}.legend{font:12px monospace;fill:var(--muted)}
+  </style>
+</head>
+<body><main><p class="eyebrow">SPEC 09 · EXPERIENCIA DE APRENDIZAJE</p><h1>Tutor IA con límites claros</h1><p class="lead">El estudiante conversa, el backend valida su plan y consumo, el tutor responde con orientación segura y cada interacción queda disponible para continuar aprendiendo.</p>
+<svg viewBox="0 0 1080 560" role="img" aria-labelledby="tutor-title tutor-desc">
+  <title id="tutor-title">Flujo del Tutor IA</title><desc id="tutor-desc">Flujo desde el estudiante hasta una respuesta segura del tutor, pasando por validación de plan, límites de uso y persistencia de mensajes.</desc>
+  <defs><marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#58716b"/></marker><marker id="accent-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#c96d48"/></marker></defs>
+  <path class="line" d="M120 238H176"/><path class="line" d="M320 238H376"/><path class="line" d="M520 238H576"/>
+  <path class="accent-line" d="M720 238H776"/><path class="line" d="M848 290V390H698"/><path class="line" d="M612 390H360V290"/><path class="line" d="M848 186V108H698"/><path class="line" d="M612 108H360V186"/>
+  <rect class="node" x="32" y="204" width="88" height="68" rx="20"/><text class="txt" x="76" y="234">Estudiante</text><text class="sub" x="76" y="253">mensaje</text>
+  <rect class="node" x="176" y="204" width="144" height="68" rx="6"/><text class="txt" x="248" y="234">API Tutor</text><text class="sub" x="248" y="253">POST /mensajes</text>
+  <rect class="decision" x="376" y="190" width="144" height="96" transform="rotate(0 448 238)"/><text class="txt" x="448" y="233">¿Tiene uso</text><text class="txt" x="448" y="252">disponible?</text>
+  <rect class="focal" x="576" y="204" width="144" height="68" rx="6"/><text class="txt" x="648" y="234">Tutor IA</text><text class="sub" x="648" y="253">respuesta segura</text>
+  <rect class="node" x="776" y="204" width="144" height="68" rx="6"/><text class="txt" x="848" y="234">Respuesta</text><text class="sub" x="848" y="253">al estudiante</text>
+  <rect class="store" x="212" y="390" width="148" height="64" rx="6"/><text class="txt" x="286" y="418">Conversación</text><text class="sub" x="286" y="437">mensajes + materia</text>
+  <rect class="store" x="698" y="390" width="148" height="64" rx="6"/><text class="txt" x="772" y="418">Uso / plan</text><text class="sub" x="772" y="437">Free · Premium</text>
+  <rect class="node" x="548" y="76" width="150" height="64" rx="6"/><text class="txt" x="623" y="104">Upgrade</text><text class="sub" x="623" y="123">trial de 7 días</text>
+  <text class="label" x="748" y="226">válido</text><text class="label" x="842" y="168">límite</text><text class="label" x="517" y="378">persistir</text><text class="label" x="698" y="98">sin uso</text>
+  <line x1="32" y1="500" x2="64" y2="500" class="accent-line"/><text class="legend" x="76" y="504">camino principal</text><line x1="230" y1="500" x2="262" y2="500" class="line"/><text class="legend" x="274" y="504">persistencia y control</text>
+</svg></main></body></html>

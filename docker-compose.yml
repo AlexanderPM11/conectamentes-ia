@@ -53,6 +53,39 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       MINIMAX_API_KEY: ${MINIMAX_API_KEY:-}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
+      JEV_API_KEY: ${JEV_API_KEY:-}
+      JEV_ENDPOINT: ${JEV_ENDPOINT:-https://www.jevai.org/api/v1/decisions/model-route}
+      JEV_TIMEOUT_SECONDS: ${JEV_TIMEOUT_SECONDS:-4}
+      JEV_PRIORITIES: ${JEV_PRIORITIES:-quality,context,latency,cost}
+      JEV_CONSTRAINTS: ${JEV_CONSTRAINTS:-Use only a configured candidate.,Keep the selected model compatible with the configured text provider.}
+      JEV_STAKES: ${JEV_STAKES:-medium}
+      TUTOR_FREE_MESSAGE_LIMIT: ${TUTOR_FREE_MESSAGE_LIMIT:-15}
+      TUTOR_PREMIUM_MESSAGE_LIMIT: ${TUTOR_PREMIUM_MESSAGE_LIMIT:-2000}
+      TUTOR_USAGE_PERIOD_DAYS: ${TUTOR_USAGE_PERIOD_DAYS:-30}
+      TUTOR_TRIAL_DAYS: ${TUTOR_TRIAL_DAYS:-7}
+      TUTOR_TRIAL_PROVIDER: ${TUTOR_TRIAL_PROVIDER:-trial}
+      TUTOR_AI_TIMEOUT_SECONDS: ${TUTOR_AI_TIMEOUT_SECONDS:-30}
+      TUTOR_AI_TEMPERATURE: ${TUTOR_AI_TEMPERATURE:-0.35}
+      TUTOR_AI_MAX_TOKENS: ${TUTOR_AI_MAX_TOKENS:-700}
+      TUTOR_SAFETY_TERMS: ${TUTOR_SAFETY_TERMS:-examen,copiar,hazme la tarea,resuelve todo}
+      TUTOR_AI_FALLBACK_MESSAGE: ${TUTOR_AI_FALLBACK_MESSAGE:-Vamos a trabajar {subject}. Primero, dime qué parte ya entiendes y cuál te confunde.}
+      AI_ROUTER_LONG_TASK_CHARS: ${AI_ROUTER_LONG_TASK_CHARS:-900}
+      AI_ROUTER_COMPLEXITY_TERMS: ${AI_ROUTER_COMPLEXITY_TERMS:-demuestra,compara,deriva}
+      AI_MODEL_FAST: ${AI_MODEL_FAST:-gpt-4o-mini}
+      AI_MODEL_FAST_DESCRIPTION: ${AI_MODEL_FAST_DESCRIPTION:-Fast general tutor for short explanations, simple practice and low latency.}
+      AI_MODEL_FAST_COST: ${AI_MODEL_FAST_COST:-low}
+      AI_MODEL_FAST_LATENCY: ${AI_MODEL_FAST_LATENCY:-low}
+      AI_MODEL_FAST_CONTEXT: ${AI_MODEL_FAST_CONTEXT:-32k}
+      AI_MODEL_REASONING: ${AI_MODEL_REASONING:-gpt-4o}
+      AI_MODEL_REASONING_DESCRIPTION: ${AI_MODEL_REASONING_DESCRIPTION:-Stronger reasoning tutor for difficult university concepts and multi-step problems.}
+      AI_MODEL_REASONING_COST: ${AI_MODEL_REASONING_COST:-medium}
+      AI_MODEL_REASONING_LATENCY: ${AI_MODEL_REASONING_LATENCY:-medium}
+      AI_MODEL_REASONING_CONTEXT: ${AI_MODEL_REASONING_CONTEXT:-128k}
+      AI_MODEL_LONG_CONTEXT: ${AI_MODEL_LONG_CONTEXT:-}
+      AI_MODEL_LONG_CONTEXT_DESCRIPTION: ${AI_MODEL_LONG_CONTEXT_DESCRIPTION:-Long-context tutor for extended study material and conversation history.}
+      AI_MODEL_LONG_CONTEXT_COST: ${AI_MODEL_LONG_CONTEXT_COST:-high}
+      AI_MODEL_LONG_CONTEXT_LATENCY: ${AI_MODEL_LONG_CONTEXT_LATENCY:-medium}
+      AI_MODEL_LONG_CONTEXT_WINDOW: ${AI_MODEL_LONG_CONTEXT_WINDOW:-200k}
     depends_on:
       mysql:
         condition: service_healthy

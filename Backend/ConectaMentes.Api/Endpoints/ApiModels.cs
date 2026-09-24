@@ -25,3 +25,5 @@ public sealed record ModerationInput(ReportStatus Status, string ResolutionNote)
 public sealed record ReputationRow(Guid EvaluatedUserId, string DisplayName, string Career, string Topic, int Usefulness, int Respect, int Fulfillment, int Clarity, double Score, string Comment, DateTimeOffset CreatedAt);
 public sealed record ReputationRankingItem(Guid UserId, string DisplayName, string Career, string Topic, int TotalRatings, double Average, double RankingScore, double Clarity, double Fulfillment, int Position);
 public sealed record CommentInput(string Text);
+public sealed record TutorConversationInput(string Subject, string? Title = null);
+public sealed record TutorMessageInput(string Content, string? Mode = "explicar");

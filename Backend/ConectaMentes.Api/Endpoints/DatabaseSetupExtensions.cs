@@ -94,6 +94,13 @@ public static class DatabaseSetupExtensions
             );
             """);
 
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS `TutorConversations` (`Id` char(36) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL, `UserId` char(36) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL, `Subject` varchar(160) NOT NULL, `Title` varchar(180) NOT NULL, `CreatedAt` datetime(6) NOT NULL, `LastActivityAt` datetime(6) NOT NULL, PRIMARY KEY (`Id`), INDEX `IX_TutorConversations_UserId_LastActivityAt` (`UserId`,`LastActivityAt`));
+            CREATE TABLE IF NOT EXISTS `TutorMessages` (`Id` char(36) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL, `ConversationId` char(36) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL, `Role` int NOT NULL, `Content` varchar(8000) NOT NULL, `Mode` varchar(40) NOT NULL, `SafetyStatus` int NOT NULL, `CreatedAt` datetime(6) NOT NULL, PRIMARY KEY (`Id`), INDEX `IX_TutorMessages_ConversationId_CreatedAt` (`ConversationId`,`CreatedAt`));
+            CREATE TABLE IF NOT EXISTS `TutorUsages` (`Id` char(36) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL, `UserId` char(36) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL, `PeriodStart` datetime(6) NOT NULL, `MessagesUsed` int NOT NULL, `UpdatedAt` datetime(6) NOT NULL, PRIMARY KEY (`Id`), UNIQUE INDEX `IX_TutorUsages_UserId_PeriodStart` (`UserId`,`PeriodStart`));
+            CREATE TABLE IF NOT EXISTS `Subscriptions` (`Id` char(36) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL, `UserId` char(36) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL, `Plan` int NOT NULL, `Status` int NOT NULL, `Provider` varchar(40) NOT NULL, `ExternalSubscriptionId` varchar(180) NULL, `StartedAt` datetime(6) NOT NULL, `ExpiresAt` datetime(6) NULL, PRIMARY KEY (`Id`), UNIQUE INDEX `IX_Subscriptions_UserId` (`UserId`));
+            """);
+
         await EnsureColumnAsync(db, "Sessions", "MeetUrl");
         await EnsureColumnAsync(db, "Sessions", "GoogleCalendarEventId");
         await EnsureColumnAsync(db, "Users", "AccessStatus");

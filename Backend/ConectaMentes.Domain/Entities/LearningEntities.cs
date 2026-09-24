@@ -6,6 +6,10 @@ public enum MatchStatus { Sugerida, Rechazada, Aceptada }
 public enum ConnectionStatus { PendienteColaborador, Activa, Rechazada, Cancelada }
 public enum SessionStatus { Agendada, Completada, Cancelada }
 public enum ReportStatus { Abierto, EnRevision, Resuelto }
+public enum TutorPlan { Free, Premium }
+public enum SubscriptionStatus { Active, Trialing, Canceled, Expired }
+public enum TutorMessageRole { User, Assistant }
+public enum TutorSafetyStatus { Clear, Redirected }
 
 public sealed class SkillProfile { public Guid Id { get; set; } = Guid.NewGuid(); public Guid UserId { get; set; } public string Topic { get; set; } = ""; public SkillType Type { get; set; } public int Confidence { get; set; } public bool Visible { get; set; } = true; }
 public sealed class Availability { public Guid Id { get; set; } = Guid.NewGuid(); public Guid UserId { get; set; } public string TimeSlots { get; set; } = ""; public string PreferredMode { get; set; } = "ambas"; }
@@ -23,3 +27,7 @@ public sealed class Notification { public Guid Id { get; set; } = Guid.NewGuid()
 public sealed class PushSubscriptionRecord { public Guid Id { get; set; } = Guid.NewGuid(); public Guid UserId { get; set; } public string EndpointHash { get; set; } = ""; public string Endpoint { get; set; } = ""; public string P256dh { get; set; } = ""; public string Auth { get; set; } = ""; public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow; public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow; }
 public sealed class ChatMessage { public Guid Id { get; set; } = Guid.NewGuid(); public Guid ConnectionId { get; set; } public Guid SenderId { get; set; } public string Text { get; set; } = ""; public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow; }
 public sealed class ChatAttachment { public Guid Id { get; set; } = Guid.NewGuid(); public Guid MessageId { get; set; } public Guid ConnectionId { get; set; } public Guid SenderId { get; set; } public string FileName { get; set; } = ""; public string StoredName { get; set; } = ""; public string ContentType { get; set; } = "application/octet-stream"; public long SizeBytes { get; set; } public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow; }
+public sealed class TutorConversation { public Guid Id { get; set; } = Guid.NewGuid(); public Guid UserId { get; set; } public string Subject { get; set; } = "General"; public string Title { get; set; } = "Nueva conversación"; public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow; public DateTimeOffset LastActivityAt { get; set; } = DateTimeOffset.UtcNow; }
+public sealed class TutorMessage { public Guid Id { get; set; } = Guid.NewGuid(); public Guid ConversationId { get; set; } public TutorMessageRole Role { get; set; } public string Content { get; set; } = ""; public string Mode { get; set; } = "explicar"; public TutorSafetyStatus SafetyStatus { get; set; } = TutorSafetyStatus.Clear; public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow; }
+public sealed class TutorUsage { public Guid Id { get; set; } = Guid.NewGuid(); public Guid UserId { get; set; } public DateTime PeriodStart { get; set; } public int MessagesUsed { get; set; } public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow; }
+public sealed class Subscription { public Guid Id { get; set; } = Guid.NewGuid(); public Guid UserId { get; set; } public TutorPlan Plan { get; set; } = TutorPlan.Free; public SubscriptionStatus Status { get; set; } = SubscriptionStatus.Active; public string Provider { get; set; } = "internal"; public string? ExternalSubscriptionId { get; set; } public DateTimeOffset StartedAt { get; set; } = DateTimeOffset.UtcNow; public DateTimeOffset? ExpiresAt { get; set; } }

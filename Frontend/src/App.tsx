@@ -14,14 +14,16 @@ import { Ranking } from './features/Ranking/Ranking';
 import { Security } from './features/Security/Security';
 import { InstitutionalPanel } from './features/Institutional/InstitutionalPanel';
 import { AdminPanel } from './features/Admin/AdminPanel';
+import { Tutor } from './features/Tutor/Tutor';
 
 type Mode = 'welcome' | 'login' | 'register' | 'recover';
-type Tab = 'inicio' | 'perfil' | 'solicitudes' | 'coincidencias' | 'mensajes' | 'ranking' | 'agenda' | 'seguridad' | 'panel' | 'admin';
-type IconName = 'home' | 'profile' | 'request' | 'match' | 'message' | 'bell' | 'search' | 'calendar' | 'shield' | 'chart' | 'star' | 'more' | 'back';
+type Tab = 'inicio' | 'perfil' | 'solicitudes' | 'tutor' | 'coincidencias' | 'mensajes' | 'ranking' | 'agenda' | 'seguridad' | 'panel' | 'admin';
+type IconName = 'home' | 'profile' | 'request' | 'tutor' | 'match' | 'message' | 'bell' | 'search' | 'calendar' | 'shield' | 'chart' | 'star' | 'more' | 'back';
 
 const navItems: { id: Tab; label: string; icon: IconName }[] = [
   { id: 'inicio', label: 'Inicio', icon: 'home' },
   { id: 'solicitudes', label: 'Solicitudes', icon: 'request' },
+  { id: 'tutor', label: 'Tutor IA', icon: 'tutor' },
   { id: 'coincidencias', label: 'Conexiones', icon: 'match' },
   { id: 'mensajes', label: 'Mensajes', icon: 'message' },
   { id: 'ranking', label: 'Ranking', icon: 'star' },
@@ -241,7 +243,7 @@ export function App() {
   }
 
   const unreadCount = notifications.filter(item => !item.isRead).length;
-  const primaryNavItems = navItems.slice(0, 4);
+  const primaryNavItems = navItems.slice(0, 5);
   const secondaryTabActive = ['perfil', 'ranking', 'seguridad', 'panel', 'admin'].includes(tab);
   const bottomActiveIndex = showMore || secondaryTabActive ? 4 : Math.max(0, primaryNavItems.findIndex(item => item.id === tab));
   const isChatActive = tab === 'mensajes';
@@ -337,6 +339,7 @@ export function App() {
             {tab === 'inicio' && <Home me={me} profile={profile} requests={requests} connections={connections} navigate={navigate} />}
             {tab === 'perfil' && <Profile profile={profile} setProfile={setProfile} notify={setNotice} userId={me?.id} user={me} setMe={setMe} onOpenRanking={() => navigate('ranking')} connections={connections} onOpenChat={(connectionId: string) => { setChatConnectionId(connectionId); navigate('mensajes'); }} onRefreshConnections={async () => setConnections(await api('/api/conexiones'))} />}
             {tab === 'solicitudes' && <Requests requests={requests} form={requestForm} setForm={setRequestForm} submit={submitRequest} calculate={calculate} notify={setNotice} editingRequest={editingRequest} setEditingRequest={setEditingRequest} deleteRequest={deleteRequest} />}
+            {tab === 'tutor' && <Tutor notify={setNotice} />}
             {tab === 'coincidencias' && <ConnectionsExplorer matches={matches} requestId={selectedRequest} connections={connections} onRefreshConnections={async () => setConnections(await api('/api/conexiones'))} notify={setNotice} onOpenChat={(connectionId: string) => { setChatConnectionId(connectionId); navigate('mensajes'); }} onRequestTopic={(topic: string) => { setRequestForm({ ...requestForm, topic, description: `Quiero encontrar una persona para aprender sobre ${topic}.`, helpType: 'comprender', desiredSchedule: '' }); navigate('solicitudes'); }} />}
             {tab === 'mensajes' && messagesView}
             {tab === 'ranking' && <Ranking notify={setNotice} />}
@@ -364,7 +367,7 @@ export function App() {
                   </div>
                   <button className="close-button" onClick={() => setShowMore(false)}>×</button>
                 </div>
-                {availableNavItems.slice(4).map(item => <NavButton key={item.id} item={item} active={tab === item.id} onClick={() => navigate(item.id)} />)}
+            {availableNavItems.slice(5).map(item => <NavButton key={item.id} item={item} active={tab === item.id} onClick={() => navigate(item.id)} />)}
                 <button className="sheet-logout" onClick={signOut}>Cerrar sesión</button>
               </section>
             </div>

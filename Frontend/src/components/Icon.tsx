@@ -5,6 +5,7 @@ export function Icon({ name }: { name: IconName }) {
     home: 'M3 11.5 12 4l9 7.5M5.5 10v10h13V10M9 20v-6h6v6',
     profile: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm7 8a7 7 0 0 0-14 0',
     request: 'M6 4h12v16H6zM9 8h6M9 12h6M9 16h3',
+    tutor: 'M12 3a8 8 0 0 0-8 8v4a3 3 0 0 0 3 3h2v-6H6v-1a6 6 0 0 1 12 0v1h-3v6h2a3 3 0 0 0 3-3v-4a8 8 0 0 0-8-8Zm-2 18h4',
     match: 'M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8 0a4 4 0 1 0 0-8M2 20a6 6 0 0 1 12 0m-2-3a6 6 0 0 1 10 3',
     message: 'M4 5h16v11H8l-4 4V5Zm4 5h8m-8 3h5',
     bell: 'M6 17h12l-2-3V9a4 4 0 0 0-8 0v5l-2 3Zm4 3h4',

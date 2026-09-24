@@ -70,6 +70,7 @@ para el agente:
 | 6. Cierre del ciclo | `06-valoraciones-reconocimiento` | 05 |
 | 7. Vista institucional | `07-panel-institucional` | 03, 06 (necesita datos agregados) |
 | 8. Confianza y seguridad | `08-seguridad-moderacion` | 05 (puede iniciar en paralelo desde la fase 2 para el modelo de reportes) |
+| 9. Tutor IA freemium | `09-tutor-ia` | 01 (usa autenticación; puede enriquecerse con perfil desde 02) |
 
 Nota: 07 y 08 pueden desarrollarse en paralelo por integrantes distintos una
 vez existan datos de solicitudes/sesiones, siguiendo la distribución del
@@ -105,6 +106,7 @@ coincidencias/IA/panel).
   (marcando qué se agrega y qué nunca se expone, para dejar visible la
   regla de privacidad).
 - Fase 8: **flowchart** del ciclo de vida de un Reporte.
+- Fase 9: **flowchart** del Tutor IA (mensaje → plan/límite → respuesta segura → persistencia).
 
 Cada diagrama se guarda en `docs/diagrams/` con el nombre de la fase, por
 ejemplo `docs/diagrams/04-motor-coincidencias.html`.

@@ -5,6 +5,7 @@ using ConectaMentes.Api.Auth;
 using ConectaMentes.Api.Endpoints;
 using ConectaMentes.Application.Auth;
 using ConectaMentes.Application.Reputation;
+using ConectaMentes.Application.Tutor;
 using ConectaMentes.Domain.Entities;
 using ConectaMentes.Infrastructure;
 using ConectaMentes.Infrastructure.Persistence;
@@ -40,6 +41,8 @@ builder.Services.AddScoped<DevicePushService>();
 builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<ITutorService, TutorService>();
+builder.Services.AddScoped<IModelRouter, JevModelRouter>();
 builder.Services.AddSingleton<ITokenService, JwtTokenService>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
 {

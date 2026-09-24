@@ -22,6 +22,10 @@ public sealed class ConectaMentesDbContext(DbContextOptions<ConectaMentesDbConte
     public DbSet<PushSubscriptionRecord> PushSubscriptions => Set<PushSubscriptionRecord>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
     public DbSet<ChatAttachment> ChatAttachments => Set<ChatAttachment>();
+    public DbSet<TutorConversation> TutorConversations => Set<TutorConversation>();
+    public DbSet<TutorMessage> TutorMessages => Set<TutorMessage>();
+    public DbSet<TutorUsage> TutorUsages => Set<TutorUsage>();
+    public DbSet<Subscription> Subscriptions => Set<Subscription>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -93,6 +97,32 @@ public sealed class ConectaMentesDbContext(DbContextOptions<ConectaMentesDbConte
             entity.Property(item => item.FileName).HasMaxLength(180).IsRequired();
             entity.Property(item => item.StoredName).HasMaxLength(260).IsRequired();
             entity.Property(item => item.ContentType).HasMaxLength(120).IsRequired();
+        });
+        modelBuilder.Entity<TutorConversation>(entity =>
+        {
+            entity.HasKey(item => item.Id);
+            entity.HasIndex(item => new { item.UserId, item.LastActivityAt });
+            entity.Property(item => item.Subject).HasMaxLength(160).IsRequired();
+            entity.Property(item => item.Title).HasMaxLength(180).IsRequired();
+        });
+        modelBuilder.Entity<TutorMessage>(entity =>
+        {
+            entity.HasKey(item => item.Id);
+            entity.HasIndex(item => new { item.ConversationId, item.CreatedAt });
+            entity.Property(item => item.Content).HasMaxLength(8000).IsRequired();
+            entity.Property(item => item.Mode).HasMaxLength(40).IsRequired();
+        });
+        modelBuilder.Entity<TutorUsage>(entity =>
+        {
+            entity.HasKey(item => item.Id);
+            entity.HasIndex(item => new { item.UserId, item.PeriodStart }).IsUnique();
+        });
+        modelBuilder.Entity<Subscription>(entity =>
+        {
+            entity.HasKey(item => item.Id);
+            entity.HasIndex(item => item.UserId).IsUnique();
+            entity.Property(item => item.Provider).HasMaxLength(40).IsRequired();
+            entity.Property(item => item.ExternalSubscriptionId).HasMaxLength(180);
         });
         modelBuilder.Entity<Rating>(entity =>
         {
