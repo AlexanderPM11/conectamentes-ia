@@ -241,7 +241,7 @@ export function App() {
   }
 
   const unreadCount = notifications.filter(item => !item.isRead).length;
-  const primaryNavItems = navItems.slice(0, 5);
+  const primaryNavItems = navItems.slice(0, 4);
   const secondaryTabActive = ['perfil', 'ranking', 'seguridad', 'panel', 'admin'].includes(tab);
   const bottomActiveIndex = showMore || secondaryTabActive ? 4 : Math.max(0, primaryNavItems.findIndex(item => item.id === tab));
   const isChatActive = tab === 'mensajes';
@@ -364,7 +364,7 @@ export function App() {
                   </div>
                   <button className="close-button" onClick={() => setShowMore(false)}>×</button>
                 </div>
-            {availableNavItems.slice(5).map(item => <NavButton key={item.id} item={item} active={tab === item.id} onClick={() => navigate(item.id)} />)}
+                {availableNavItems.slice(4).map(item => <NavButton key={item.id} item={item} active={tab === item.id} onClick={() => navigate(item.id)} />)}
                 <button className="sheet-logout" onClick={signOut}>Cerrar sesión</button>
               </section>
             </div>
