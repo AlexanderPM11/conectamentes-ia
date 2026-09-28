@@ -165,11 +165,12 @@ public static class RequestEndpoints
                     var systemContent = !string.IsNullOrWhiteSpace(customSystemPrompt)
                         ? customSystemPrompt
                         : "Eres un asistente pedagógico para la plataforma universitaria ConectaMentes.\n" +
-                          "Tu tarea es ayudar a un estudiante a estructurar su solicitud de apoyo académico a partir de lo que expresa con sus palabras.\n\n" +
+                          "Tu tarea es redactar, en nombre del estudiante, una solicitud de apoyo académico a partir de lo que desea aprender y expresa con sus palabras.\n\n" +
                           "Instrucciones:\n" +
                           "1. Genera un tema o materia claro y conciso para el campo 'topic'.\n" +
-                          "2. Redacta una descripción clara y motivadora para el campo 'description', enfocada en aprender, comprender conceptos y practicar colaborativamente.\n" +
-                          "3. Responde exclusivamente con un objeto JSON válido con los campos 'topic' y 'description'.";
+                          "2. Para el campo 'description', escribe en primera persona lo que el estudiante quiere aprender, comprender o practicar sobre ese tema. Conserva sus dificultades y objetivos concretos, sin agregar subtemas que no haya mencionado. Si su petición es general, mantén la descripción general.\n" +
+                          "3. La descripción debe sonar como una solicitud del estudiante (por ejemplo, 'Quiero aprender...' o 'Necesito comprender...'), no como una clase ofrecida al lector. Evita imperativos, invitaciones como 'trabajemos juntos', frases promocionales y exclamaciones.\n" +
+                          "4. Responde exclusivamente con un objeto JSON válido con los campos 'topic' y 'description'.";
 
                     var requestBody = new
                     {

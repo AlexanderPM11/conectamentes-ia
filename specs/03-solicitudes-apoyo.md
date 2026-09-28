@@ -33,6 +33,11 @@ que necesita ayuda, como disparador del motor de coincidencias.
 - **Given** el formulario de creación de solicitud en móvil, **when** el
   estudiante escribe la descripción libre, **then** el campo de texto no
   produce zoom automático y se expande cómodamente en pantallas pequeñas.
+- **Given** que un estudiante usa el asistente de IA para redactar su
+  solicitud, **when** se genera la descripción, **then** expresa en primera
+  persona lo que desea aprender o comprender sobre el tema, conserva los
+  detalles que aportó y no inventa objetivos ni se dirige al lector como
+  si ofreciera una clase.
 
 ## Reglas de negocio
 
